@@ -1,0 +1,53 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() { return request.auth != null; }
+    function isMedico() { return isSignedIn() && request.auth.token.role == 'medico'; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+
+    // Usuarios básicos
+    match /usuarios/{uid} {
+      allow read: if isMedico() || isOwner(uid);
+      allow create: if isSignedIn() && isOwner(uid);
+      allow update: if isMedico() || isOwner(uid);
+    }
+
+    // Perfiles clínicos
+    match /perfiles/{uid} {
+      allow read: if isMedico() || isOwner(uid);
+      allow create, update: if isMedico() || isOwner(uid);
+    }
+
+    // Disponibilidades administradas por el médico
+    match /disponibilidades/{id} {
+      allow read: if true; // visibles para todos
+      allow create, update, delete: if isMedico();
+    }
+
+    // Solicitudes de turno
+    match /solicitudes/{id} {
+      allow create: if isSignedIn(); // paciente crea
+      allow read, update:
+        if isMedico() ||
+           (isSignedIn() && request.resource.data.pacienteId == request.auth.uid) ||
+           (isSignedIn() && resource.data.pacienteId == request.auth.uid);
+      allow delete: if isMedico();
+    }
+
+    // Turnos confirmados
+    match /turnosConfirmados/{id} {
+      allow read:
+        if isMedico() ||
+           (isSignedIn() && resource.data.pacienteId == request.auth.uid);
+      allow create, update, delete: if isMedico();
+    }
+
+    // Notificaciones por usuario (to = uid)
+    match /notificaciones/{id} {
+      allow create: if isSignedIn();
+      allow read, update, delete:
+        if isSignedIn() && resource.data.to == request.auth.uid;
+    }
+  }
+}

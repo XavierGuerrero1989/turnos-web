@@ -1,0 +1,81 @@
+:root{
+  --bg:#f8fafc;          /* slate-50 */
+  --card:#ffffff;
+  --text:#0f172a;        /* slate-900 */
+  --muted:#64748b;       /* slate-500 */
+  --primary:#b325eb;     /* blue-600 */
+  --primary-light:  #d884f2 ;
+  --primary-dark: #7d0fae;
+  --primary-bg: #f9f0fc;
+  --border:#e2e8f0;      /* slate-200 */
+  --radius:16px;
+  --shadow:0 10px 20px rgba(2,6,23,.06);
+}
+
+*{box-sizing:border-box}
+html,body,#root{height:100%}
+body{
+  margin:0; font-family: ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto;
+  color:var(--text); background:var(--bg);
+}
+
+a{color:inherit; text-decoration:none}
+input,button,select{font:inherit}
+
+.container{max-width:1000px; margin:0 auto; padding:24px}
+.center-screen{
+  min-height:calc(100dvh - 80px);
+  display:flex; align-items:center; justify-content:center; padding:24px;
+}
+
+/* Card */
+.card{
+  background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow); padding:28px;
+}
+
+/* Stack (espaciado vertical) */
+.stack>*+*{margin-top:12px}
+.stack-lg>*+*{margin-top:16px}
+
+/* Inputs */
+.input{
+  width:100%; padding:12px 14px; border:1px solid var(--border);
+  border-radius:12px; background:#fff; transition:.15s ease;
+}
+.input:focus{
+  outline:none; border-color:var(--primary);
+  box-shadow:0 0 0 4px var(--primary-100);
+}
+.label{display:block; font-weight:600; color:var(--muted); margin-bottom:6px}
+
+/* Botones */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  padding:12px 16px; border-radius:12px; border:1px solid transparent;
+  cursor:pointer; transition:.15s ease; font-weight:600;
+}
+.btn:disabled{opacity:.6; cursor:not-allowed}
+.btn-primary{background:var(--primary); color:#fff}
+.btn-primary:hover{background:var(--primary-700)}
+.btn-outline{background:#fff; border-color:var(--border); color:var(--text)}
+.btn-outline:hover{border-color:var(--primary); color:var(--primary)}
+
+/* Header */
+.header{
+  height:64px; display:flex; align-items:center; gap:16px;
+  padding:0 16px; border-bottom:1px solid var(--border); background:#fff;
+}
+.brand{display:flex; align-items:center; gap:10px; font-weight:800;}
+.brand-badge{
+  width:32px; height:32px; border-radius:10px; background:var(--primary);
+  display:grid; place-items:center; color:#fff; font-size:14px;
+}
+
+/* Form ancho fijo */
+.form-narrow{width:100%; max-width:420px}
+.form-actions{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:8px}
+
+/* Helpers */
+.helper{text-align:center; color:var(--muted); font-size:.92rem}
+.error{color:#b91c1c; font-size:.9rem}

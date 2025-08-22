@@ -1,26 +1,46 @@
-import { useState } from "react";
-import { signInWithEmailAndPassword } from "firebase/auth";
+// src/pages/publico/Login.jsx
+import { useEffect, useState } from "react";
+import { signInWithEmailAndPassword, getIdTokenResult } from "firebase/auth";
 import { auth } from "../../firebase.js";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../../auth/AuthProvider.jsx";
 import Card from "../../components/ui/Card.jsx";
 import Input from "../../components/ui/Input.jsx";
 import Button from "../../components/ui/Button.jsx";
 
-export default function Login(){
+export default function Login() {
   const [email, setEmail] = useState("");
   const [pass, setPass]   = useState("");
   const [err, setErr]     = useState("");
   const nav = useNavigate();
+  const { user, role, loading } = useAuth();
+
+  // Si ya está logueado, redirigí según rol
+  useEffect(() => {
+    if (!loading && user) {
+      if (role === "medico") nav("/medico", { replace: true });
+      else nav("/", { replace: true });
+    }
+  }, [user, role, loading, nav]);
 
   const submit = async (e) => {
-    e.preventDefault(); setErr("");
+    e.preventDefault();
+    setErr("");
     try {
-      await signInWithEmailAndPassword(auth, email, pass);
-      nav("/");
+      const cred = await signInWithEmailAndPassword(auth, email, pass);
+
+      // Traer claims frescos y decidir adónde ir
+      const token = await getIdTokenResult(cred.user, true);
+      const r = token.claims.role || "paciente";
+      if (r === "medico") nav("/medico", { replace: true });
+      else nav("/", { replace: true });
     } catch (e) {
-      setErr(e.message || "Error al iniciar sesión");
+      setErr(e?.message || "Error al iniciar sesión");
     }
   };
+
+  // Mientras resolvemos auth, no mostramos el form para evitar parpadeos
+  if (loading) return null;
 
   return (
     <div className="center-screen">
@@ -56,15 +76,13 @@ export default function Login(){
             />
             {err && <div className="error">{err}</div>}
 
-            <div className="form-actions">
+            <div className="btn-row">
               <Button type="submit">Entrar</Button>
               <Link to="/register" className="btn btn-outline">Crear cuenta</Link>
             </div>
           </form>
 
-          <p className="helper">
-            ¿Olvidaste tu contraseña? (lo sumamos luego)
-          </p>
+          <p className="helper">¿Olvidaste tu contraseña? (lo sumamos luego)</p>
         </div>
       </Card>
     </div>

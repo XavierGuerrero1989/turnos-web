@@ -22,6 +22,8 @@ import TurnosConfirmados from "./pages/medico/TurnosConfirmados.jsx";
 import Pacientes from "./pages/medico/Pacientes.jsx";
 import InvitarPaciente from "./pages/medico/InvitarPaciente.jsx";
 
+import AdminSetMedico from "./pages/AdminSetMedico.jsx";
+
 export default function App() {
   return (
     <>
@@ -67,6 +69,9 @@ export default function App() {
         } />
 
         <Route path="*" element={<Navigate to="/" replace />} />
+
+
+        <Route path="/admin/set-medico" element={<ProtectedRoute><AdminSetMedico /></ProtectedRoute>} />
       </Routes>
     </>
   );

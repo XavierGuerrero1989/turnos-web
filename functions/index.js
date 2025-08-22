@@ -14,7 +14,7 @@ export const setUserRole = onCall(async (request) => {
   }
 
   // ⚠️ Reemplazá por tu UID personal para actuar como superadmin
-  const SUPERADMIN_UIDS = new Set(["TU_UID_PERSONAL_AQUI"]);
+  const SUPERADMIN_UIDS = new Set(["ijPbcQYE5aOJsY5z6H6fGggRFzv1"]);
 
   if (!SUPERADMIN_UIDS.has(callerAuth.uid)) {
     throw new HttpsError("permission-denied", "No autorizado.");

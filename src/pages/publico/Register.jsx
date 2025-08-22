@@ -1,151 +1,85 @@
-import { useState } from "react";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth, db } from "../../firebase";
-import { doc, setDoc } from "firebase/firestore";
+// src/pages/publico/Register.jsx
+import { useEffect, useState } from "react";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { auth, db } from "../../firebase.js";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
+import { useAuth } from "../../auth/AuthProvider.jsx";
 
 export default function Register() {
-  const [formData, setFormData] = useState({
-    nombre: "",
-    apellido: "",
-    dni: "",
-    telefono: "",
-    email: "",
-    password: "",
+  const nav = useNavigate();
+  const { user, role } = useAuth();
+
+  // si ya está logueado, lo saco de /register
+  useEffect(() => {
+    if (user) {
+      if (role === "medico") nav("/medico");
+      else nav("/");
+    }
+  }, [user, role, nav]);
+
+  const [form, setForm] = useState({
+    nombre: "", apellido: "", dni: "", telefono: "", email: "", password: "",
   });
+  const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = async (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    if (formData.password.length < 8) {
-      Swal.fire("Error", "La contraseña debe tener al menos 8 caracteres", "error");
+    if (form.password.length < 8) {
+      await Swal.fire("Error", "La contraseña debe tener al menos 8 caracteres", "error");
       return;
     }
     try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        formData.email,
-        formData.password
-      );
-      const user = userCredential.user;
+      const { user } = await createUserWithEmailAndPassword(auth, form.email, form.password);
 
+      // opcional: que el displayName sea "Nombre Apellido"
+      await updateProfile(user, { displayName: `${form.nombre} ${form.apellido}`.trim() });
+
+      // guardamos datos base
       await setDoc(doc(db, "usuarios", user.uid), {
-        nombre: formData.nombre,
-        apellido: formData.apellido,
-        dni: formData.dni,
-        telefono: formData.telefono,
-        email: formData.email,
+        nombre: form.nombre,
+        apellido: form.apellido,
+        dni: form.dni,
+        telefono: form.telefono,
+        email: form.email,
+        role: "paciente",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
 
-      Swal.fire("¡Éxito!", "Usuario registrado correctamente", "success");
-    } catch (error) {
-      Swal.fire("Error", error.message, "error");
+      await Swal.fire("¡Listo!", "Usuario creado con éxito.", "success");
+      nav("/"); // ← redirigir a Home (quedando logueado)
+    } catch (err) {
+      await Swal.fire("Error", err.message || "No se pudo crear la cuenta", "error");
     }
   };
 
   return (
-    <div style={{ display: "flex", justifyContent: "center", marginTop: "60px" }}>
+    <div style={{ display:"flex", justifyContent:"center", marginTop:60 }}>
       <div style={{
-        background: "white",
-        padding: "30px",
-        borderRadius: "12px",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-        width: "100%",
-        maxWidth: "400px"
+        background:"#fff", padding:30, borderRadius:12,
+        boxShadow:"0 10px 20px rgba(2,6,23,.06)", width:"100%", maxWidth:420
       }}>
-        <div style={{ display: "flex", alignItems: "center", marginBottom: "20px" }}>
+        <div style={{ display:"flex", alignItems:"center", marginBottom:20 }}>
           <div style={{
-            background: "#a225ebff",
-            color: "white",
-            fontWeight: "bold",
-            borderRadius: "50%",
-            width: "36px",
-            height: "36px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            marginRight: "10px"
-          }}>
-            Tx
-          </div>
-          <h2 style={{ margin: 0 }}>Turnos</h2>
+            background:"var(--primary)", color:"#fff", fontWeight:700,
+            borderRadius:10, width:36, height:36, display:"grid", placeItems:"center", marginRight:10
+          }}>Tx</div>
+          <h2 style={{ margin:0 }}>Turnos</h2>
         </div>
 
-        <h3 style={{ marginBottom: "10px", textAlign: "center" }}>Crear cuenta</h3>
+        <h3 style={{ textAlign:"center", margin:"0 0 14px" }}>Crear cuenta</h3>
 
-        <form onSubmit={handleSubmit}>
-          <input
-            type="text"
-            name="nombre"
-            placeholder="Nombre"
-            value={formData.nombre}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          />
-          <input
-            type="text"
-            name="apellido"
-            placeholder="Apellido"
-            value={formData.apellido}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          />
-          <input
-            type="text"
-            name="dni"
-            placeholder="DNI"
-            value={formData.dni}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          />
-          <input
-            type="tel"
-            name="telefono"
-            placeholder="Teléfono"
-            value={formData.telefono}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          />
-          <input
-            type="email"
-            name="email"
-            placeholder="Correo electrónico"
-            value={formData.email}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          />
-          <input
-            type="password"
-            name="password"
-            placeholder="Contraseña (mínimo 8 caracteres)"
-            value={formData.password}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          />
+        <form onSubmit={submit}>
+          <input name="nombre" placeholder="Nombre" value={form.nombre} onChange={onChange} required style={inputStyle}/>
+          <input name="apellido" placeholder="Apellido" value={form.apellido} onChange={onChange} required style={inputStyle}/>
+          <input name="dni" placeholder="DNI" value={form.dni} onChange={onChange} required style={inputStyle}/>
+          <input name="telefono" placeholder="Teléfono" value={form.telefono} onChange={onChange} required style={inputStyle}/>
+          <input type="email" name="email" placeholder="Correo electrónico" value={form.email} onChange={onChange} required style={inputStyle}/>
+          <input type="password" name="password" placeholder="Contraseña (mínimo 8 caracteres)" value={form.password} onChange={onChange} required style={inputStyle}/>
 
-          <button
-            type="submit"
-            style={{
-              marginTop: "10px",
-              width: "100%",
-              padding: "10px",
-              border: "none",
-              borderRadius: "8px",
-              background: "#9f25ebff",
-              color: "white",
-              fontWeight: "bold",
-              cursor: "pointer"
-            }}
-          >
+          <button type="submit" className="btn btn-primary" style={{ width:"100%", marginTop:10 }}>
             Registrarse
           </button>
         </form>
@@ -154,12 +88,7 @@ export default function Register() {
   );
 }
 
-// estilo reutilizable para inputs
 const inputStyle = {
-  width: "100%",
-  padding: "10px",
-  marginBottom: "10px",
-  border: "1px solid #d1d5db",
-  borderRadius: "8px",
-  outline: "none",
+  width:"100%", padding:"10px 12px", marginBottom:10,
+  border:"1px solid var(--border, #e2e8f0)", borderRadius:8, outline:"none",
 };

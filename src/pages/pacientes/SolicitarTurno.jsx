@@ -5,7 +5,9 @@ import {
   collection,
   getDocs,
   addDoc,
-  serverTimestamp
+  serverTimestamp,
+  doc,
+  getDoc,
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
@@ -26,7 +28,9 @@ export default function SolicitarTurno(){
 
   // Redirigir si NO es paciente
   useEffect(() => {
-    if (!loading && (!user || role === "medico")) nav(role === "medico" ? "/medico" : "/login", { replace:true });
+    if (!loading && (!user || role === "medico")) {
+      nav(role === "medico" ? "/medico" : "/login", { replace:true });
+    }
   }, [user, role, loading, nav]);
 
   const today = new Date();
@@ -45,10 +49,10 @@ export default function SolicitarTurno(){
       try {
         const q = await getDocs(collection(db, "disponibilidades"));
         const map = {};
-        q.forEach((doc) => {
-          const d = doc.data();
+        q.forEach((docSnap) => {
+          const d = docSnap.data();
           // Normalizamos nombres de franja (por si hay docs viejos)
-          map[doc.id] = {
+          map[docSnap.id] = {
             manana: !!(d.manana?.abierto ?? d.manana ?? d.maniana?.abierto ?? d.maniana),
             tarde:  !!(d.tarde?.abierto  ?? d.tarde)
           };
@@ -98,27 +102,47 @@ export default function SolicitarTurno(){
   };
 
   const submit = async (e) => {
-    e.preventDefault();
-    if (!selectedDay) return Swal.fire("Falta elegir día", "Seleccioná un día disponible.", "warning");
-    if (!franja) return Swal.fire("Falta la franja", "Elegí mañana o tarde.", "warning");
+  e.preventDefault();
+  if (!selectedDay) return Swal.fire("Falta elegir día", "Seleccioná un día disponible.", "warning");
+  if (!franja) return Swal.fire("Falta la franja", "Elegí mañana o tarde.", "warning");
+
+  try {
+    // Buscar datos del paciente en /usuarios/{uid}
+    let pacienteNombre = user?.displayName || "";
     try {
-      await addDoc(collection(db, "solicitudes"), {
-        pacienteId: user.uid,
-        pacienteNombre: user.displayName || "",
-        diaSolicitado: selectedDay,
-        franja, // "manana" | "tarde"
-        comentario: comentario || "",
-        estado: "pendiente",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-      await Swal.fire("Solicitud enviada", "El médico te propondrá un horario específico.", "success");
-      nav("/mis-turnos");
-    } catch (err) {
-      console.error(err);
-      Swal.fire("Error", err.message || "No se pudo enviar la solicitud", "error");
+      const perfilSnap = await getDoc(doc(db, "usuarios", user.uid));
+      if (perfilSnap.exists()) {
+        const p = perfilSnap.data();
+        const full = [p.nombre, p.apellido].filter(Boolean).join(" ").trim();
+        if (full) pacienteNombre = full;
+      }
+    } catch (e) {
+      console.warn("No se pudo leer usuario:", e);
     }
-  };
+
+    if (!pacienteNombre || !pacienteNombre.trim()) {
+      pacienteNombre = `Paciente ${user.uid.slice(0, 6)}`;
+    }
+
+    await addDoc(collection(db, "solicitudes"), {
+      pacienteId: user.uid,
+      pacienteNombre,
+      pacienteEmail: user.email || perfilSnap.data()?.email || "",  // 👈 nuevo
+      diaSolicitado: selectedDay,
+      franja,
+      comentario: comentario || "",
+      estado: "pendiente",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    await Swal.fire("Solicitud enviada", "El médico te propondrá un horario específico.", "success");
+    nav("/mis-turnos");
+  } catch (err) {
+    console.error(err);
+    Swal.fire("Error", err.message || "No se pudo enviar la solicitud", "error");
+  }
+};
 
   if (loading || loadingData) return null;
 

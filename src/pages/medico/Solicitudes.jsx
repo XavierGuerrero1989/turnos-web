@@ -11,10 +11,38 @@ import {
   doc,
   updateDoc,
   serverTimestamp,
+  getDocs,
 } from "firebase/firestore";
 import Swal from "sweetalert2";
 
+// === Helpers generales ===
 const toISO = (d) => d.toISOString().slice(0, 10); // YYYY-MM-DD
+
+// === Helpers de slots ===
+const SLOT_DEFS = {
+  manana: { start: "08:00", end: "12:00" },
+  tarde:  { start: "14:00", end: "18:00" },
+};
+
+function timeToMinutes(hhmm) {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+}
+function minutesToHHMM(mins) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+function generateSlots(startHHMM, endHHMM, stepMin = 20) {
+  const out = [];
+  let t = timeToMinutes(startHHMM);
+  const end = timeToMinutes(endHHMM);
+  while (t <= end) {
+    out.push(minutesToHHMM(t));
+    t += stepMin;
+  }
+  return out;
+}
 
 export default function Solicitudes() {
   const { role, loading } = useAuth();
@@ -34,49 +62,116 @@ export default function Solicitudes() {
 
     let qRef;
     if (filter === "todas") {
+      // solo orderBy -> no requiere índice compuesto adicional
       qRef = query(collection(db, "solicitudes"), orderBy("createdAt", "desc"));
     } else {
-      qRef = query(
-        collection(db, "solicitudes"),
-        where("estado", "==", filter),
-        orderBy("createdAt", "desc")
-      );
+      // evitamos índice compuesto: NO usamos orderBy aquí
+      qRef = query(collection(db, "solicitudes"), where("estado", "==", filter));
     }
 
     const unsub = onSnapshot(
       qRef,
       (snap) => {
-        setItems(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        let arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        if (filter !== "todas") {
+          // orden en memoria por createdAt desc
+          arr.sort(
+            (a, b) =>
+              (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)
+          );
+        }
+        setItems(arr);
         setLoadingList(false);
       },
-      () => setLoadingList(false)
+      (err) => {
+        console.error("onSnapshot(solicitudes) error:", err);
+        setLoadingList(false);
+      }
     );
 
     return () => unsub();
   }, [role, filter]);
 
   const proponerHorario = async (sol) => {
+    // franja de la solicitud del paciente
+    const franja = sol.franja === "tarde" ? "tarde" : "manana";
+    const rango = SLOT_DEFS[franja];
+    if (!rango) {
+      return Swal.fire("Error", "No se pudo determinar la franja (mañana/tarde).", "error");
+    }
+
+    // día base preseleccionado
     const diaBase = sol.propuesta?.dia || sol.diaSolicitado || toISO(new Date());
-    const horaBase = sol.propuesta?.hora || "10:00";
+
+    // lee turnos confirmados del día y arma opciones del select
+    const buildOptionsHTML = async (diaISO) => {
+      const q = query(
+        collection(db, "turnosConfirmados"),
+        where("dia", "==", diaISO)
+      );
+      const snap = await getDocs(q);
+      const taken = new Set();
+      snap.forEach((d) => {
+        const h = d.data().hora; // "HH:MM"
+        if (typeof h === "string") taken.add(h);
+      });
+
+      const slots = generateSlots(rango.start, rango.end, 20); // cada 20'
+      const opts = slots
+        .map((hhmm) => {
+          const ocupado = taken.has(hhmm);
+          const label = `${hhmm} — ${ocupado ? "CON TURNO" : "DISPONIBLE"}`;
+          return `<option value="${hhmm}" ${ocupado ? "disabled" : ""}>${label}</option>`;
+        })
+        .join("");
+
+      return opts;
+    };
 
     const { value } = await Swal.fire({
       title: "Proponer horario",
       html: `
         <div style="text-align:left">
-          <label style="display:block; font-weight:600; margin:6px 0 4px">Día</label>
-          <input id="sw-dia" type="date" value="${diaBase}" class="swal2-input" style="width:100%; margin:0" />
-          <label style="display:block; font-weight:600; margin:12px 0 4px">Hora exacta</label>
-          <input id="sw-hora" type="time" value="${horaBase}" class="swal2-input" style="width:100%; margin:0" />
+          <div style="margin-bottom:10px">
+            <label style="display:block; font-weight:600; margin:6px 0 4px">Franja</label>
+            <input class="swal2-input" value="${franja === "manana" ? "Mañana" : "Tarde"}" disabled style="width:100%; margin:0" />
+          </div>
+          <div style="margin-bottom:10px">
+            <label style="display:block; font-weight:600; margin:6px 0 4px">Día</label>
+            <input id="sw-dia" type="date" value="${diaBase}" class="swal2-input" style="width:100%; margin:0" />
+          </div>
+          <div>
+            <label style="display:block; font-weight:600; margin:12px 0 4px">Horario (cada 20')</label>
+            <select id="sw-hora" class="swal2-input" style="width:100%; margin:0"></select>
+            <div class="helper" style="margin-top:6px">Las opciones deshabilitadas están <strong>con turno</strong>.</div>
+          </div>
         </div>
       `,
+      didOpen: async () => {
+        const diaInput = document.getElementById("sw-dia");
+        const horaSelect = document.getElementById("sw-hora");
+
+        // carga inicial
+        horaSelect.innerHTML = await buildOptionsHTML(diaInput.value);
+
+        // recargar si cambia el día
+        diaInput.addEventListener("change", async () => {
+          horaSelect.innerHTML = `<option>Cargando…</option>`;
+          horaSelect.innerHTML = await buildOptionsHTML(diaInput.value);
+        });
+      },
       focusConfirm: false,
       confirmButtonText: "Proponer",
       showCancelButton: true,
       preConfirm: () => {
-        const dia = document.getElementById("sw-dia").value;
-        const hora = document.getElementById("sw-hora").value;
-        if (!dia || !hora) {
-          Swal.showValidationMessage("Completá día y hora");
+        const dia = (document.getElementById("sw-dia") || {}).value;
+        const hora = (document.getElementById("sw-hora") || {}).value;
+        if (!dia) {
+          Swal.showValidationMessage("Elegí un día");
+          return;
+        }
+        if (!hora) {
+          Swal.showValidationMessage("Elegí un horario disponible");
           return;
         }
         return { dia, hora };
@@ -87,7 +182,7 @@ export default function Solicitudes() {
 
     try {
       await updateDoc(doc(db, "solicitudes", sol.id), {
-        propuesta: { dia: value.dia, hora: value.hora },
+        propuesta: { dia: value.dia, hora: value.hora, franja },
         estado: "propuesta",
         updatedAt: serverTimestamp(),
       });
@@ -180,7 +275,12 @@ export default function Solicitudes() {
             >
               <div>
                 <div style={{ fontWeight: 700, marginBottom: 4 }}>
-                  {sol.pacienteNombre || "Paciente sin nombre"} · {sol.pacienteId?.slice(0, 6)}…
+                  {(sol.pacienteNombre && sol.pacienteNombre.trim()) || "Paciente sin nombre"}
+                  {sol.pacienteEmail && (
+                    <span style={{ color: "var(--muted)", marginLeft: 8 }}>
+                      {sol.pacienteEmail}
+                    </span>
+                  )}
                 </div>
                 <div style={{ color: "var(--muted)" }}>
                   Día pedido: <strong>{sol.diaSolicitado}</strong> · Franja:{" "}

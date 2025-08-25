@@ -50,16 +50,61 @@ input,button,select{font:inherit}
 .label{display:block; font-weight:600; color:var(--muted); margin-bottom:6px}
 
 /* Botones */
-.btn{
-  display:inline-flex; align-items:center; justify-content:center; gap:8px;
-  padding:12px 16px; border-radius:12px; border:1px solid transparent;
-  cursor:pointer; transition:.15s ease; font-weight:600;
+/* Garantiza que los botones (incluidos <a class="btn">) acepten márgenes verticales */
+.btn {
+  display: inline-flex;            /* o inline-block */
+  align-items: center;
+  justify-content: center;
+
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  border: 1px solid transparent;
+
+  /* espaciado vertical estándar */
+  margin-top: 8px;
+  margin-bottom: 6px;
 }
-.btn:disabled{opacity:.6; cursor:not-allowed}
-.btn-primary{background:var(--primary); color:#fff}
-.btn-primary:hover{background:var(--primary-700)}
-.btn-outline{background:#fff; border-color:var(--border); color:var(--text)}
-.btn-outline:hover{border-color:var(--primary); color:var(--primary)}
+
+/* Estilos de variantes (los que ya tenías) */
+.btn-primary {
+  background: var(--primary, #b325eb);
+  color: #fff;
+  border-color: var(--primary, #b325eb);
+}
+.btn-primary:hover {
+  background: #9b1cd1;
+  border-color: #9b1cd1;
+  color: #fff;
+}
+
+.btn-outline {
+  background: #fff;
+  color: var(--primary, #b325eb);
+  border-color: var(--primary, #b325eb);
+}
+.btn-outline:hover {
+  background: #f5e6fb;
+  color: var(--primary, #b325eb);
+  border-color: var(--primary, #b325eb);
+}
+
+/* Filas de botones: usá gap para separación horizontal */
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.btn-row .btn {
+  margin-top: 0;         /* en filas, ya usamos gap */
+  margin-bottom: 0;
+}
+
+/* Quita subrayado en <a class="btn"> */
+a.btn { text-decoration: none; }
+
 
 /* Header */
 .header{

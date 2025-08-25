@@ -2,30 +2,31 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // 🔹 Helpers
     function isSignedIn() { return request.auth != null; }
     function isMedico() { return isSignedIn() && request.auth.token.role == 'medico'; }
     function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
 
-    // Usuarios básicos
+    // 🔹 Usuarios básicos
     match /usuarios/{uid} {
       allow read: if isMedico() || isOwner(uid);
       allow create: if isSignedIn() && isOwner(uid);
       allow update: if isMedico() || isOwner(uid);
     }
 
-    // Perfiles clínicos
+    // 🔹 Perfiles clínicos
     match /perfiles/{uid} {
       allow read: if isMedico() || isOwner(uid);
       allow create, update: if isMedico() || isOwner(uid);
     }
 
-    // Disponibilidades administradas por el médico
+    // 🔹 Disponibilidades (solo médico administra)
     match /disponibilidades/{id} {
       allow read: if true; // visibles para todos
       allow create, update, delete: if isMedico();
     }
 
-    // Solicitudes de turno
+    // 🔹 Solicitudes de turno
     match /solicitudes/{id} {
       allow create: if isSignedIn(); // paciente crea
       allow read, update:
@@ -35,7 +36,7 @@ service cloud.firestore {
       allow delete: if isMedico();
     }
 
-    // Turnos confirmados
+    // 🔹 Turnos confirmados (legacy, si lo mantenés separado)
     match /turnosConfirmados/{id} {
       allow read:
         if isMedico() ||
@@ -43,11 +44,18 @@ service cloud.firestore {
       allow create, update, delete: if isMedico();
     }
 
-    // Notificaciones por usuario (to = uid)
+    // 🔹 Notificaciones (propietario = to)
     match /notificaciones/{id} {
       allow create: if isSignedIn();
       allow read, update, delete:
         if isSignedIn() && resource.data.to == request.auth.uid;
+    }
+
+    // 🔹 Evoluciones clínicas
+    match /evoluciones/{id} {
+      allow read: if isMedico() || isOwner(resource.data.pacienteId); 
+      allow create: if isMedico(); 
+      allow update, delete: if isMedico(); // o, más fino, if isMedico() && request.auth.uid == resource.data.medicoId
     }
   }
 }

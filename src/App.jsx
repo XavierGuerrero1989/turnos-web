@@ -21,6 +21,7 @@ import Solicitudes from "./pages/medico/Solicitudes.jsx";
 import TurnosConfirmados from "./pages/medico/TurnosConfirmados.jsx";
 import Pacientes from "./pages/medico/Pacientes.jsx";
 import InvitarPaciente from "./pages/medico/InvitarPaciente.jsx";
+import PacienteFicha from "./pages/medico/PacienteFicha.jsx";
 
 import AdminSetMedico from "./pages/AdminSetMedico.jsx";
 
@@ -67,6 +68,9 @@ export default function App() {
         <Route path="/medico/invitar" element={
           <MedicoRoute><InvitarPaciente /></MedicoRoute>
         } />
+
+        <Route path="/medico/paciente/:id" element={<PacienteFicha />} />
+
 
         <Route path="*" element={<Navigate to="/" replace />} />
 

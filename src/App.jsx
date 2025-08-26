@@ -1,7 +1,9 @@
+// App.jsx
 import { Routes, Route, Navigate } from "react-router-dom";
 import Header from "./components/Header.jsx";
 import { ProtectedRoute } from "./auth/ProtectedRoute.jsx";
 import { MedicoRoute } from "./auth/MedicoRoute.jsx";
+import RedirectByRole from "./auth/RedirectByRole.jsx";
 
 // Público
 import Login from "./pages/publico/Login.jsx";
@@ -35,17 +37,27 @@ export default function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/onboarding" element={<Onboarding />} />
 
+        {/* Redirect raíz según rol */}
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <RedirectByRole />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Paciente */}
-        <Route path="/" element={
+        <Route path="/paciente" element={
           <ProtectedRoute><HomePaciente /></ProtectedRoute>
         } />
-        <Route path="/solicitar-turno" element={
+        <Route path="/paciente/solicitar-turno" element={
           <ProtectedRoute><SolicitarTurno /></ProtectedRoute>
         } />
-        <Route path="/mis-turnos" element={
+        <Route path="/paciente/mis-turnos" element={
           <ProtectedRoute><MisTurnos /></ProtectedRoute>
         } />
-        <Route path="/perfil" element={
+        <Route path="/paciente/perfil" element={
           <ProtectedRoute><PerfilPaciente /></ProtectedRoute>
         } />
 
@@ -68,14 +80,15 @@ export default function App() {
         <Route path="/medico/invitar" element={
           <MedicoRoute><InvitarPaciente /></MedicoRoute>
         } />
-
         <Route path="/medico/paciente/:id" element={<PacienteFicha />} />
 
+        {/* Admin */}
+        <Route path="/admin/set-medico" element={
+          <ProtectedRoute><AdminSetMedico /></ProtectedRoute>
+        } />
 
+        {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
-
-
-        <Route path="/admin/set-medico" element={<ProtectedRoute><AdminSetMedico /></ProtectedRoute>} />
       </Routes>
     </>
   );

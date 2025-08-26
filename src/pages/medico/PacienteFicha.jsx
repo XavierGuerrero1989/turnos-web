@@ -36,6 +36,23 @@ export default function PacienteFicha() {
   const [form, setForm] = useState({ nombre:"", apellido:"", dni:"", email:"", telefono:"" });
   const [saving, setSaving] = useState(false);
 
+  // 🔹 NUEVO: estado para datos clínicos
+  const [clin, setClin] = useState({
+    edad: "",
+    antecedentesPersonales: "",
+    antecedentesQuirurgicos: "",
+    medicacion: "",
+    gestas: "",
+    partos: "",
+    cesareas: "",
+    abortos: "",
+    ritmoMenstrual: "",
+    pareja: "", // "si" | "no" | ""
+    ultimoControlGinecologico: "",
+    metodoAnticonceptivo: "",
+    antecedentesAHF: "",
+  });
+
   const [sols, setSols] = useState([]);              // solicitudes del paciente
   const [evols, setEvols] = useState([]);            // evoluciones del paciente
   const [nuevoTxt, setNuevoTxt] = useState("");
@@ -54,6 +71,23 @@ export default function PacienteFicha() {
           dni: data.dni || "",
           email: data.email || "",
           telefono: data.telefono || "",
+        });
+        // 🔹 Cargar datos clínicos existentes
+        const c = data.clinica || {};
+        setClin({
+          edad: c.edad ?? "",
+          antecedentesPersonales: c.antecedentesPersonales ?? "",
+          antecedentesQuirurgicos: c.antecedentesQuirurgicos ?? "",
+          medicacion: c.medicacion ?? "",
+          gestas: c.gestas ?? "",
+          partos: c.partos ?? "",
+          cesareas: c.cesareas ?? "",
+          abortos: c.abortos ?? "",
+          ritmoMenstrual: c.ritmoMenstrual ?? "",
+          pareja: c.pareja ?? "",
+          ultimoControlGinecologico: c.ultimoControlGinecologico ?? "",
+          metodoAnticonceptivo: c.metodoAnticonceptivo ?? "",
+          antecedentesAHF: c.antecedentesAHF ?? "",
         });
       })
       .catch((e) => console.error(e));
@@ -104,12 +138,31 @@ export default function PacienteFicha() {
     e?.preventDefault?.();
     setSaving(true);
     try {
+      // sanitizar numéricos (permitir vacío)
+      const toNum = (v) => (v === "" || v === null ? "" : Number(v));
+      const clinica = {
+        edad: toNum(clin.edad),
+        antecedentesPersonales: clin.antecedentesPersonales || "",
+        antecedentesQuirurgicos: clin.antecedentesQuirurgicos || "",
+        medicacion: clin.medicacion || "",
+        gestas: toNum(clin.gestas),
+        partos: toNum(clin.partos),
+        cesareas: toNum(clin.cesareas),
+        abortos: toNum(clin.abortos),
+        ritmoMenstrual: clin.ritmoMenstrual || "",
+        pareja: clin.pareja || "",
+        ultimoControlGinecologico: clin.ultimoControlGinecologico || "",
+        metodoAnticonceptivo: clin.metodoAnticonceptivo || "",
+        antecedentesAHF: clin.antecedentesAHF || "",
+      };
+
       await updateDoc(doc(db, "usuarios", pacienteId), {
         nombre: form.nombre.trim(),
         apellido: form.apellido.trim(),
         dni: form.dni.trim(),
         email: form.email.trim(),
         telefono: form.telefono.trim(),
+        clinica, // 👈 agrupado en un objeto
         updatedAt: serverTimestamp(),
       });
       Swal.fire("Guardado", "Datos del paciente actualizados.", "success");
@@ -172,9 +225,10 @@ export default function PacienteFicha() {
         <h2 style={{ margin:0 }}>Ficha del paciente</h2>
       </div>
 
-      {/* Datos básicos */}
+      {/* Datos básicos + clínicos */}
       <div className="card" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
         <form className="stack" onSubmit={savePaciente}>
+          {/* Básicos */}
           <div className="stack">
             <label className="label">Nombre</label>
             <input className="input" value={form.nombre} onChange={(e)=>setForm(f=>({...f, nombre:e.target.value}))} />
@@ -194,6 +248,75 @@ export default function PacienteFicha() {
           <div className="stack">
             <label className="label">Teléfono</label>
             <input className="input" value={form.telefono} onChange={(e)=>setForm(f=>({...f, telefono:e.target.value}))} />
+          </div>
+
+          {/* 🔹 Sección clínica */}
+          <hr style={{ border:"none", borderTop:"1px solid var(--border)", margin:"8px 0" }} />
+          <h3 style={{ margin:"0 0 4px" }}>Datos clínicos</h3>
+
+          <div style={{ display:"grid", gap:12, gridTemplateColumns:"repeat(3, minmax(0,1fr))" }}>
+            <div>
+              <label className="label">Edad</label>
+              <input className="input" type="number" min="0" value={clin.edad} onChange={e=>setClin(c=>({...c, edad:e.target.value}))} />
+            </div>
+            <div>
+              <label className="label">Gestas</label>
+              <input className="input" type="number" min="0" value={clin.gestas} onChange={e=>setClin(c=>({...c, gestas:e.target.value}))} />
+            </div>
+            <div>
+              <label className="label">Partos</label>
+              <input className="input" type="number" min="0" value={clin.partos} onChange={e=>setClin(c=>({...c, partos:e.target.value}))} />
+            </div>
+            <div>
+              <label className="label">Cesáreas</label>
+              <input className="input" type="number" min="0" value={clin.cesareas} onChange={e=>setClin(c=>({...c, cesareas:e.target.value}))} />
+            </div>
+            <div>
+              <label className="label">Abortos</label>
+              <input className="input" type="number" min="0" value={clin.abortos} onChange={e=>setClin(c=>({...c, abortos:e.target.value}))} />
+            </div>
+            <div>
+              <label className="label">Pareja</label>
+              <select className="input" value={clin.pareja} onChange={e=>setClin(c=>({...c, pareja:e.target.value}))}>
+                <option value="">—</option>
+                <option value="si">Sí</option>
+                <option value="no">No</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display:"grid", gap:12, gridTemplateColumns:"repeat(2, minmax(0,1fr))" }}>
+            <div>
+              <label className="label">Ritmo menstrual</label>
+              <input className="input" placeholder="p.ej. regular 28 días" value={clin.ritmoMenstrual} onChange={e=>setClin(c=>({...c, ritmoMenstrual:e.target.value}))} />
+            </div>
+            <div>
+              <label className="label">Último control ginecológico</label>
+              <input className="input" type="date" value={clin.ultimoControlGinecologico} onChange={e=>setClin(c=>({...c, ultimoControlGinecologico:e.target.value}))} />
+            </div>
+            <div>
+              <label className="label">Método anticonceptivo</label>
+              <input className="input" value={clin.metodoAnticonceptivo} onChange={e=>setClin(c=>({...c, metodoAnticonceptivo:e.target.value}))} />
+            </div>
+          </div>
+
+          <div className="stack">
+            <div>
+              <label className="label">Antecedentes personales</label>
+              <textarea className="input" rows={3} value={clin.antecedentesPersonales} onChange={e=>setClin(c=>({...c, antecedentesPersonales:e.target.value}))} />
+            </div>
+            <div>
+              <label className="label">Antecedentes quirúrgicos</label>
+              <textarea className="input" rows={3} value={clin.antecedentesQuirurgicos} onChange={e=>setClin(c=>({...c, antecedentesQuirurgicos:e.target.value}))} />
+            </div>
+            <div>
+              <label className="label">Medicación</label>
+              <textarea className="input" rows={3} value={clin.medicacion} onChange={e=>setClin(c=>({...c, medicacion:e.target.value}))} />
+            </div>
+            <div>
+              <label className="label">Antecedentes AHF</label>
+              <textarea className="input" rows={3} value={clin.antecedentesAHF} onChange={e=>setClin(c=>({...c, antecedentesAHF:e.target.value}))} />
+            </div>
           </div>
 
           <div style={{ display:"flex", gap:8, marginTop:8 }}>
@@ -242,7 +365,7 @@ export default function PacienteFicha() {
         </div>
       </div>
 
-      {/* Evolución clínica */}
+      {/* Evolución clínica (INTACTA) */}
       <div className="card">
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <h3 style={{ marginTop:0, marginBottom:8 }}>Evolución clínica</h3>

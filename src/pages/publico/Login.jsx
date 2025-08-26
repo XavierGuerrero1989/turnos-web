@@ -19,7 +19,7 @@ export default function Login() {
   useEffect(() => {
     if (!loading && user) {
       if (role === "medico") nav("/medico", { replace: true });
-      else nav("/", { replace: true });
+      else nav("/paciente", { replace: true });
     }
   }, [user, role, loading, nav]);
 

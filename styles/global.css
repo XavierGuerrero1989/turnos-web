@@ -117,6 +117,79 @@ a.btn { text-decoration: none; }
   display:grid; place-items:center; color:#fff; font-size:14px;
 }
 
+/* Layout base del header: brand izquierda, nav centro, acciones derecha */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 16px;               /* Espacio mínimo entre secciones */
+  padding: 10px 16px;
+}
+
+/* Empuja el nav al centro y deja acciones a la derecha */
+.nav {
+  margin-left: 12px;
+  flex: 1 1 auto;          /* Ocupa el espacio central */
+}
+
+/* Lista horizontal con separación consistente */
+.nav-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;               /* ← Espaciado entre items */
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Estilo de link del nav (no toca tu paleta existente) */
+.nav-link {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  padding: 8px 10px;       /* “hit area” amigable */
+  border-radius: 10px;     /* suave para que combine con tus botones redondeados */
+}
+
+/* Estado activo de NavLink: react-router agrega la clase .active */
+.nav-link.active {
+  font-weight: 600;
+  outline: none;
+  /* si ya tenés variables o utilidades, podés usar tu color principal */
+  /* color: #b325eb; */
+  /* background: rgba(179, 37, 235, 0.08); */
+}
+
+/* Acciones a la derecha (login/salir) */
+.header-actions {
+  margin-left: auto;       /* empuja a la derecha */
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Ajustes suaves para la marca */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.brand-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  font-weight: 700;
+  /* acá podés mantener tu color de acento si ya lo usabas */
+  /* background: #b325eb; color: #fff; */
+}
+
+
 /* Form ancho fijo */
 .form-narrow{width:100%; max-width:420px}
 .form-actions{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:8px}

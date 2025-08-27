@@ -1,339 +1,330 @@
 // src/pages/medico/DashboardMedico.jsx
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/AuthProvider.jsx";
 import { db } from "../../firebase.js";
 import {
-  collection, query, where, onSnapshot, orderBy, limit,
-  getDocs, doc, updateDoc
+  collection, query, where, orderBy, limit, onSnapshot,
+  getDocs, documentId
 } from "firebase/firestore";
-import Swal from "sweetalert2";
 
-// Helpers
-const toDate = (yyyy_mm_dd, hhmm = "00:00") => {
-  if (!yyyy_mm_dd) return null;
-  const [h, m] = (hhmm || "00:00").split(":").map(Number);
-  const d = new Date(yyyy_mm_dd + "T00:00:00");
-  d.setHours(h || 0, m || 0, 0, 0);
-  return d;
+// Helpers fecha/hora
+const toISO = (d) => d.toISOString().slice(0, 10);
+const hoyISO = () => toISO(new Date());
+const fmtHora = (hhmm) => {
+  if (!hhmm) return "";
+  const [h, m = "00"] = String(hhmm).split(":");
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 };
-const fmtDay = (d) => d.toISOString().slice(0, 10);
-const todayStr = () => fmtDay(new Date());
+const fmtFechaES = (iso) => (!iso ? "" : iso.split("-").reverse().join("/"));
 
 export default function DashboardMedico() {
   const { role, loading } = useAuth();
-  const [sols, setSols] = useState([]);         // solicitudes
-  const [pacs, setPacs] = useState([]);         // pacientes
-  const [evols, setEvols] = useState([]);       // evoluciones
-  const [busyId, setBusyId] = useState(null);
+  const nav = useNavigate();
 
-  // Filtros (por defecto: últimos 30 días hacia adelante)
-  const [from, setFrom] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - 30);
-    return fmtDay(d);
+  // Guard: solo médico
+  useEffect(() => {
+    if (!loading && role !== "medico") nav("/", { replace: true });
+  }, [role, loading, nav]);
+
+  // Filtros para próximos turnos
+  const [desde, setDesde] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 30); return toISO(d);
   });
-  const [to, setTo] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() + 60);
-    return fmtDay(d);
+  const [hasta, setHasta] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() + 60); return toISO(d);
   });
-
-  // Gate
-  if (loading) return null;
-  if (role !== "medico") return null;
-
-  // Suscripción a solicitudes
-  useEffect(() => {
-    const qRef = query(collection(db, "solicitudes"));
-    const unsub = onSnapshot(qRef, (snap) => {
-      const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setSols(arr);
-    });
-    return () => unsub();
-  }, []);
-
-  // Pacientes (no necesito tiempo real, sólo un fetch al entrar)
-  useEffect(() => {
-    const fetch = async () => {
-      const qRef = query(collection(db, "usuarios"), where("role", "==", "paciente"));
-      const res = await getDocs(qRef);
-      setPacs(res.docs.map((d) => ({ id: d.id, ...d.data() })));
-    };
-    fetch();
-  }, []);
-
-  // Últimas evoluciones (live)
-  useEffect(() => {
-    const qRef = query(collection(db, "evoluciones"), orderBy("createdAt", "desc"), limit(10));
-    const unsub = onSnapshot(qRef, (snap) => {
-      setEvols(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
-    return () => unsub();
-  }, []);
-
-  // Derivados
-  const hoy = todayStr();
-
-  const agendaHoy = useMemo(() => {
-    return sols
-      .filter((s) => s.estado === "confirmada" && s.propuesta?.dia === hoy)
-      .map((s) => ({ ...s, _when: toDate(s.propuesta.dia, s.propuesta.hora) }))
-      .sort((a, b) => (a._when?.getTime() ?? 0) - (b._when?.getTime() ?? 0));
-  }, [sols, hoy]);
-
-  const propuestasPend = useMemo(() => {
-    // filtro por rango si la propuesta tiene fecha
-    return sols
-      .filter((s) => s.estado === "propuesta")
-      .filter((s) => {
-        const d = toDate(s.propuesta?.dia, s.propuesta?.hora);
-        if (!d) return true;
-        return fmtDay(d) >= from && fmtDay(d) <= to;
-      })
-      .sort((a, b) => {
-        const ad = toDate(a.propuesta?.dia, a.propuesta?.hora);
-        const bd = toDate(b.propuesta?.dia, b.propuesta?.hora);
-        return (ad?.getTime() ?? 0) - (bd?.getTime() ?? 0);
-      });
-  }, [sols, from, to]);
-
-  const solicitudesNuevas = useMemo(() => {
-    return sols
-      .filter((s) => s.estado === "pendiente")
-      .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
-      .slice(0, 6);
-  }, [sols]);
-
-  const proximasConfirmadas = useMemo(() => {
-    const fromD = new Date(from);
-    const toD = new Date(to);
-    return sols
-      .filter((s) => s.estado === "confirmada" && s.propuesta?.dia)
-      .map((s) => ({ ...s, _when: toDate(s.propuesta.dia, s.propuesta.hora) }))
-      .filter((s) => s._when && s._when >= fromD && s._when <= toD)
-      .sort((a, b) => a._when - b._when);
-  }, [sols, from, to]);
 
   // KPIs
-  const kpiHoy = agendaHoy.length;
-  const kpiPend = propuestasPend.length;
-  const kpiProx = proximasConfirmadas.length;
-  const kpiPacs = pacs.length;
+  const [turnosHoy, setTurnosHoy] = useState(0);
+  const [propuestasCount, setPropuestasCount] = useState(0);
+  const [proximosCount, setProximosCount] = useState(0);
+  const [pacientesCount, setPacientesCount] = useState(0);
 
-  // Actions
-  const aceptar = async (sol) => {
-    setBusyId(sol.id);
-    try {
-      await updateDoc(doc(db, "solicitudes", sol.id), { estado: "confirmada" });
-      Swal.fire("Confirmado ✅", "Turno confirmado.", "success");
-    } catch (e) {
-      console.error(e);
-      Swal.fire("Error", e.message || "No se pudo confirmar", "error");
-    } finally {
-      setBusyId(null);
-    }
-  };
+  // Listas
+  const [agendaHoy, setAgendaHoy] = useState([]);               // confirmadas hoy
+  const [pendientesPropuesta, setPendientesPropuesta] = useState([]); // estado: "propuesta"
+  const [solicitudesNuevas, setSolicitudesNuevas] = useState([]);     // estado: "pendiente"
+  const [ultEvo, setUltEvo] = useState([]);                     // evoluciones recientes
+  const [pacMap, setPacMap] = useState({});                     // id -> {nombre, apellido, email}
 
-  const rechazar = async (sol) => {
-    const ok = await Swal.fire({
-      title: "Rechazar propuesta",
-      text: "¿Querés rechazar esta propuesta?",
-      icon: "question",
-      showCancelButton: true,
+  // Confirmadas HOY
+  useEffect(() => {
+    const qRef = query(
+      collection(db, "solicitudes"),
+      where("estado", "==", "confirmada"),
+      where("propuesta.dia", "==", hoyISO())
+    );
+    const unsub = onSnapshot(qRef, (snap) => {
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (a.propuesta?.hora || "").localeCompare(b.propuesta?.hora || ""));
+      setAgendaHoy(rows);
+      setTurnosHoy(rows.length);
     });
-    if (!ok.isConfirmed) return;
-    setBusyId(sol.id);
-    try {
-      await updateDoc(doc(db, "solicitudes", sol.id), { estado: "pendiente", propuesta: null });
-      Swal.fire("Listo", "La propuesta fue rechazada.", "success");
-    } catch (e) {
-      console.error(e);
-      Swal.fire("Error", e.message || "No se pudo rechazar", "error");
-    } finally {
-      setBusyId(null);
-    }
+    return () => unsub();
+  }, []);
+
+  // Propuestas pendientes
+  useEffect(() => {
+    const qRef = query(collection(db, "solicitudes"), where("estado", "==", "propuesta"));
+    const unsub = onSnapshot(qRef, (snap) => {
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) =>
+          (a.propuesta?.dia || "").localeCompare(b.propuesta?.dia || "") ||
+          (a.propuesta?.hora || "").localeCompare(b.propuesta?.hora || "")
+        );
+      setPendientesPropuesta(rows);
+      setPropuestasCount(rows.length);
+    });
+    return () => unsub();
+  }, []);
+
+  // Próximos turnos (confirmadas en rango) — filtra en memoria para evitar índice compuesto
+  useEffect(() => {
+    const qRef = query(collection(db, "solicitudes"), where("estado", "==", "confirmada"));
+    const unsub = onSnapshot(qRef, (snap) => {
+      const count = snap.docs
+        .map((d) => d.data())
+        .filter((s) => {
+          const dia = s.propuesta?.dia;
+          return dia && dia >= desde && dia <= hasta;
+        }).length;
+      setProximosCount(count);
+    });
+    return () => unsub();
+  }, [desde, hasta]);
+
+  // Pacientes (conteo simple)
+  useEffect(() => {
+    const qRef = query(collection(db, "usuarios"), where("role", "==", "paciente"));
+    const unsub = onSnapshot(qRef, (snap) => setPacientesCount(snap.size));
+    return () => unsub();
+  }, []);
+
+  // Solicitudes nuevas (pendiente) — ordenamos en memoria para evitar índice compuesto
+  useEffect(() => {
+    const qRef = query(collection(db, "solicitudes"), where("estado", "==", "pendiente"));
+    const unsub = onSnapshot(qRef, (snap) => {
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      rows.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+      setSolicitudesNuevas(rows.slice(0, 5));
+    });
+    return () => unsub();
+  }, []);
+
+  // Últimas evoluciones + mapa de pacientes
+  useEffect(() => {
+    const qRef = query(collection(db, "evoluciones"), orderBy("createdAt", "desc"), limit(5));
+    const unsub = onSnapshot(qRef, async (snap) => {
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setUltEvo(rows);
+
+      const ids = [...new Set(rows.map((r) => r.pacienteId).filter(Boolean))];
+      if (!ids.length) { setPacMap({}); return; }
+
+      const chunks = [];
+      for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10));
+
+      const map = {};
+      await Promise.all(chunks.map(async (chunk) => {
+        const s = await getDocs(
+          query(collection(db, "usuarios"), where(documentId(), "in", chunk))
+        );
+        s.forEach((u) => { map[u.id] = u.data(); });
+      }));
+      setPacMap(map);
+    });
+    return () => unsub();
+  }, []);
+
+  const nombreDe = (id) => {
+    const u = pacMap[id];
+    if (!u) return id; // while loading
+    const full = [u.nombre, u.apellido].filter(Boolean).join(" ").trim();
+    return full || u.email || id;
   };
+
+  if (role !== "medico") return null;
 
   return (
-    <div className="container" style={{ display: "grid", gap: 12 }}>
-      {/* Encabezado + acciones rápidas */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-        <h2 style={{ margin: 0 }}>Dashboard</h2>
-        <div className="btn-row">
-          <Link to="/medico/invitar" className="btn btn-primary">Invitar paciente</Link>
-          <Link to="/medico/solicitudes" className="btn btn-outline">Ver solicitudes</Link>
-          <Link to="/medico/disponibilidad" className="btn btn-outline">Disponibilidad</Link>
+    <div className="container" style={{ display: "grid", gap: 16 }}>
+      {/* Acciones */}
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <Link to="/medico/invitar" className="btn btn-primary">Invitar paciente</Link>
+        <Link to="/medico/solicitudes" className="btn btn-outline">Ver solicitudes</Link>
+        <Link to="/medico/disponibilidad" className="btn btn-outline">Disponibilidad</Link>
+      </div>
+
+      {/* KPI cards (responsive con .kpi-grid) */}
+      <div className="kpi-grid">
+        <div className="card">
+          <div className="muted">Turnos HOY</div>
+          <div style={{ fontSize: 28, fontWeight: 800 }}>{turnosHoy}</div>
+          <div className="muted">Confirmados para hoy</div>
+        </div>
+        <div className="card">
+          <div className="muted">Pendientes de confirmar</div>
+          <div style={{ fontSize: 28, fontWeight: 800 }}>{propuestasCount}</div>
+          <div className="muted">Propuestas enviadas</div>
+        </div>
+        <div className="card">
+          <div className="muted">Próximos turnos</div>
+          <div style={{ fontSize: 28, fontWeight: 800 }}>{proximosCount}</div>
+          <div className="muted">En el rango seleccionado</div>
+        </div>
+        <div className="card">
+          <div className="muted">Pacientes</div>
+          <div style={{ fontSize: 28, fontWeight: 800 }}>{pacientesCount}</div>
+          <div className="muted">Total en sistema</div>
         </div>
       </div>
 
-      {/* KPIs */}
-      <div className="card" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 12 }}>
-        <Kpi label="Turnos HOY" value={kpiHoy} helper="Confirmados para hoy" />
-        <Kpi label="Pendientes de confirmar" value={kpiPend} helper="Propuestas enviadas" />
-        <Kpi label="Próximos turnos" value={kpiProx} helper="En el rango seleccionado" />
-        <Kpi label="Pacientes" value={kpiPacs} helper="Total en sistema" />
-      </div>
-
-      {/* Filtros */}
-      <div className="card" style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 12 }}>
+      {/* Filtros de rango */}
+      <div className="card" style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 12, alignItems: "end" }}>
         <div>
-          <label className="label">Desde</label>
-          <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          <label className="muted" htmlFor="desde">Desde</label>
+          <input id="desde" type="date" className="input" value={desde} onChange={(e) => setDesde(e.target.value)} />
         </div>
         <div>
-          <label className="label">Hasta</label>
-          <input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          <label className="muted" htmlFor="hasta">Hasta</label>
+          <input id="hasta" type="date" className="input" value={hasta} onChange={(e) => setHasta(e.target.value)} />
         </div>
-        <div style={{ alignSelf: "end" }}>
+        <div style={{ alignSelf: "center" }}>
           <Link to="/medico/turnos" className="btn btn-outline">Ver agenda completa</Link>
         </div>
       </div>
 
-      {/* Grids principales */}
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
-        {/* Columna izquierda */}
-        <div className="stack">
-          {/* Agenda de hoy */}
-          <div className="card">
-            <h3 style={{ marginTop: 0 }}>Agenda de hoy</h3>
-            {agendaHoy.length === 0 ? (
-              <div className="helper">No hay turnos confirmados para hoy.</div>
-            ) : (
-              agendaHoy.map((s) => (
-                <Row key={s.id}
-                  left={
-                    <>
-                      <b>{s.propuesta.hora || "-"}</b> · {s.pacienteNombre || s.pacienteId || "Paciente"}
-                    </>
-                  }
-                  right={
-                    <Link className="btn btn-outline" to={`/medico/paciente/${s.pacienteId || ""}`}>
-                      Ver ficha
-                    </Link>
-                  }
-                />
-              ))
-            )}
-          </div>
-
-          {/* Propuestas pendientes (acciones) */}
-          <div className="card">
-            <h3 style={{ marginTop: 0 }}>Propuestas pendientes</h3>
-            {propuestasPend.length === 0 ? (
-              <div className="helper">No hay propuestas pendientes de confirmación.</div>
-            ) : (
-              propuestasPend.map((s) => (
-                <Row
-                  key={s.id}
-                  left={
-                    <>
-                      <b>{s.propuesta?.dia || "-"}</b> · {s.propuesta?.hora || "-"} ·{" "}
-                      {s.franja === "manana" ? "Mañana" : "Tarde"} —{" "}
-                      <span className="helper">({s.pacienteNombre || s.pacienteId || "Paciente"})</span>
-                    </>
-                  }
-                  right={
-                    <div className="btn-row">
-                      <button className="btn btn-primary" disabled={busyId === s.id} onClick={() => aceptar(s)}>
-                        {busyId === s.id ? "Confirmando..." : "Confirmar"}
-                      </button>
-                      <button className="btn btn-outline" disabled={busyId === s.id} onClick={() => rechazar(s)}>
-                        {busyId === s.id ? "Procesando..." : "Rechazar"}
-                      </button>
-                    </div>
-                  }
-                />
-              ))
-            )}
-          </div>
-
-          {/* Solicitudes nuevas */}
-          <div className="card">
-            <h3 style={{ marginTop: 0 }}>Solicitudes nuevas</h3>
-            {solicitudesNuevas.length === 0 ? (
-              <div className="helper">No hay solicitudes pendientes.</div>
-            ) : (
-              solicitudesNuevas.map((s) => (
-                <Row
-                  key={s.id}
-                  left={
-                    <>
-                      <b>{s.diaSolicitado || "-"}</b> · {s.franja === "manana" ? "Mañana" : "Tarde"} —{" "}
-                      <span className="helper">{s.pacienteNombre || s.pacienteId || "Paciente"}</span>
-                    </>
-                  }
-                  right={<Link className="btn btn-outline" to="/medico/solicitudes">Gestionar</Link>}
-                />
-              ))
-            )}
-          </div>
+      {/* Agenda de hoy + Últimas evoluciones */}
+      <div className="two-col">
+        <div className="card">
+          <h3 style={{ marginTop: 0 }}>Agenda de hoy</h3>
+          {agendaHoy.length === 0 ? (
+            <div className="muted">No hay turnos confirmados para hoy.</div>
+          ) : (
+            <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 8 }}>
+              {agendaHoy.map((t) => (
+                <li key={t.id} className="item">
+                  <strong>{fmtHora(t.propuesta?.hora)}</strong>{" "}
+                  — {t.pacienteNombre || t.pacienteEmail || t.pacienteId || "Paciente"}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
-        {/* Columna derecha */}
-        <div className="stack">
-          {/* Últimas evoluciones */}
-          <div className="card">
-            <h3 style={{ marginTop: 0 }}>Últimas evoluciones</h3>
-            {evols.length === 0 ? (
-              <div className="helper">Sin evoluciones recientes.</div>
-            ) : (
-              evols.map((ev) => (
-                <div key={ev.id} style={{ padding: "8px 0", borderTop: "1px solid var(--border)" }}>
-                  <div style={{ fontWeight: 700 }}>
-                    {new Date(ev.createdAt?.seconds ? ev.createdAt.seconds * 1000 : Date.now()).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}
+        <div className="card">
+          <h3 style={{ marginTop: 0 }}>Últimas evoluciones</h3>
+          {ultEvo.length === 0 ? (
+            <div className="muted">Sin evoluciones recientes.</div>
+          ) : (
+            <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 }}>
+              {ultEvo.map((evo) => (
+                <li key={evo.id} className="item">
+                  <div className="muted">
+                    {evo.createdAt?.toDate ? evo.createdAt.toDate().toLocaleString() : ""}
                   </div>
-                  <div className="helper">
-                    Paciente: <Link to={`/medico/paciente/${ev.pacienteId}`}>{ev.pacienteId}</Link>
+                  <div>
+                    <span className="muted">Paciente:</span>{" "}
+                    {evo.pacienteNombre || nombreDe(evo.pacienteId)}
                   </div>
-                  <div style={{ whiteSpace: "pre-wrap", marginTop: 4 }}>{ev.texto}</div>
+                  {evo.texto && <div>{evo.texto}</div>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      {/* Propuestas pendientes (sin Confirmar/Rechazar) */}
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>Propuestas pendientes</h3>
+        {pendientesPropuesta.length === 0 ? (
+          <div className="muted">No hay propuestas pendientes.</div>
+        ) : (
+          <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 }}>
+            {pendientesPropuesta.map((s) => (
+              <li key={s.id} className="item" style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center" }}>
+                <div>
+                  <strong>{fmtFechaES(s.propuesta?.dia)}</strong>{" "}
+                  · <strong>{fmtHora(s.propuesta?.hora)}</strong>{" "}
+                  · {s.franja === "manana" ? "Mañana" : "Tarde"} —{" "}
+                  <span className="muted">
+                    ({s.pacienteNombre || s.pacienteEmail || s.pacienteId || "Paciente"})
+                  </span>
                 </div>
-              ))
-            )}
-          </div>
+                <div className="btn-row">
+                  <Link to="/medico/solicitudes" className="btn btn-outline">Ver solicitud</Link>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
-          {/* Pacientes recientes */}
-          <div className="card">
-            <h3 style={{ marginTop: 0 }}>Pacientes recientes</h3>
-            {pacs.length === 0 ? (
-              <div className="helper">Sin pacientes aún.</div>
-            ) : (
-              pacs
-                .slice() // copia
-                .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
-                .slice(0, 8)
-                .map((p) => (
-                  <Row
-                    key={p.id}
-                    left={<>{p.nombre || "-"} {p.apellido || ""} <span className="helper">· {p.email}</span></>}
-                    right={<Link className="btn btn-outline" to={`/medico/paciente/${p.id}`}>Abrir</Link>}
-                  />
-                ))
-            )}
-            <div style={{ marginTop: 8 }}>
-              <Link className="btn btn-outline" to="/medico/pacientes">Ver todos</Link>
-            </div>
-          </div>
-        </div>
+      {/* Solicitudes nuevas */}
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>Solicitudes nuevas</h3>
+        {solicitudesNuevas.length === 0 ? (
+          <div className="muted">No hay solicitudes pendientes.</div>
+        ) : (
+          <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 }}>
+            {solicitudesNuevas.map((s) => (
+              <li key={s.id} className="item">
+                <strong>{fmtFechaES(s.diaSolicitado)}</strong> ·{" "}
+                {s.franja === "manana" ? "Mañana" : "Tarde"} —{" "}
+                <span className="muted">
+                  {s.pacienteNombre || s.pacienteEmail || s.pacienteId || "Paciente"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Pacientes recientes */}
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>Pacientes recientes</h3>
+        <PacientesRecientes />
       </div>
     </div>
   );
 }
 
-/* --- UI Helpers --- */
-function Kpi({ label, value, helper }) {
-  return (
-    <div className="card" style={{ padding: 16 }}>
-      <div style={{ fontSize: 12, color: "var(--muted)" }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1 }}>{value}</div>
-      <div className="helper">{helper}</div>
-    </div>
-  );
-}
+// Subcomponente: Pacientes recientes (sin índice compuesto)
+function PacientesRecientes() {
+  const nav = useNavigate();
+  const [rows, setRows] = useState([]);
 
-function Row({ left, right }) {
+  useEffect(() => {
+    const qRef = query(collection(db, "usuarios"), where("role", "==", "paciente"));
+    const unsub = onSnapshot(qRef, (snap) => {
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      // Ordenamos en cliente por updatedAt desc y tomamos 5
+      list.sort((a, b) => (b.updatedAt?.seconds ?? 0) - (a.updatedAt?.seconds ?? 0));
+      setRows(list.slice(0, 5));
+    });
+    return () => unsub();
+  }, []);
+
+  if (rows.length === 0) return <div className="muted">Sin pacientes aún.</div>;
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 8, padding: "6px 0", borderTop: "1px solid var(--border)" }}>
-      <div>{left}</div>
-      <div>{right}</div>
-    </div>
+    <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 8 }}>
+      {rows.map((p) => {
+        const nombre = [p.nombre, p.apellido].filter(Boolean).join(" ").trim() || "- -";
+        const email = p.email || "";
+        return (
+          <li key={p.id} className="item" style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 8 }}>
+            <div>
+              <div>{nombre}</div>
+              <div className="muted">{email}</div>
+            </div>
+            <button className="btn btn-outline" onClick={() => nav(`/medico/paciente/${p.id}`)}>
+              Abrir
+            </button>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

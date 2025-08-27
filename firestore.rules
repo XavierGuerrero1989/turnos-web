@@ -2,60 +2,98 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // 🔹 Helpers
+    // Helpers
     function isSignedIn() { return request.auth != null; }
-    function isMedico() { return isSignedIn() && request.auth.token.role == 'medico'; }
+    function userDoc(uid) { return get(/databases/$(database)/documents/usuarios/$(uid)); }
+    function perfilDoc(uid) { return get(/databases/$(database)/documents/perfiles/$(uid)); }
     function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
 
-    // 🔹 Usuarios básicos
-    match /usuarios/{uid} {
-      allow read: if isMedico() || isOwner(uid);
-      allow create: if isSignedIn() && isOwner(uid);
-      allow update: if isMedico() || isOwner(uid);
+    // Médico por claims o por documento keyed por UID (perfiles o usuarios)
+    function isMedico() {
+      return isSignedIn() && (
+        request.auth.token.role == 'medico' ||
+        (perfilDoc(request.auth.uid).exists() && perfilDoc(request.auth.uid).data.role == 'medico') ||
+        (userDoc(request.auth.uid).exists() && userDoc(request.auth.uid).data.role == 'medico')
+      );
     }
 
-    // 🔹 Perfiles clínicos
+    // ───────── usuarios ─────────
+    match /usuarios/{uid} {
+      allow read: if isMedico() || isOwner(uid);
+
+      // dueño se crea a sí mismo, o médico crea PACIENTE
+      allow create: if isOwner(uid)
+                    || (
+                      isMedico() &&
+                      request.resource.data.role == 'paciente' &&
+                      request.resource.data.nombre is string &&
+                      request.resource.data.apellido is string &&
+                      request.resource.data.email is string &&
+                      (request.resource.data.dni is string || request.resource.data.dni is int)
+                    );
+
+      allow update: if isOwner(uid) || (isMedico() && resource.data.role == 'paciente');
+      allow delete: if false;
+    }
+
+    // ───────── perfiles (keyed por uid) ─────────
     match /perfiles/{uid} {
       allow read: if isMedico() || isOwner(uid);
       allow create, update: if isMedico() || isOwner(uid);
     }
 
-    // 🔹 Disponibilidades (solo médico administra)
+    // ───────── disponibilidades ─────────
     match /disponibilidades/{id} {
-      allow read: if true; // visibles para todos
+      allow read: if true;
       allow create, update, delete: if isMedico();
     }
 
-    // 🔹 Solicitudes de turno
+    // ───────── solicitudes ─────────
     match /solicitudes/{id} {
-      allow create: if isSignedIn(); // paciente crea
+      allow create: if isSignedIn();
       allow read, update:
-        if isMedico() ||
-           (isSignedIn() && request.resource.data.pacienteId == request.auth.uid) ||
-           (isSignedIn() && resource.data.pacienteId == request.auth.uid);
+        if isMedico()
+        || (isSignedIn() && resource.data.pacienteId == request.auth.uid)
+        || (isSignedIn() && request.resource.data.pacienteId == request.auth.uid);
       allow delete: if isMedico();
     }
 
-    // 🔹 Turnos confirmados (legacy, si lo mantenés separado)
+    // ───────── turnosConfirmados (legacy) ─────────
     match /turnosConfirmados/{id} {
-      allow read:
-        if isMedico() ||
-           (isSignedIn() && resource.data.pacienteId == request.auth.uid);
+      allow read: if isMedico() || (isSignedIn() && resource.data.pacienteId == request.auth.uid);
       allow create, update, delete: if isMedico();
     }
 
-    // 🔹 Notificaciones (propietario = to)
+    // ───────── notificaciones ─────────
     match /notificaciones/{id} {
       allow create: if isSignedIn();
-      allow read, update, delete:
-        if isSignedIn() && resource.data.to == request.auth.uid;
+      allow read, update, delete: if isSignedIn() && resource.data.to == request.auth.uid;
     }
 
-    // 🔹 Evoluciones clínicas
+    // ───────── evoluciones ─────────
     match /evoluciones/{id} {
-      allow read: if isMedico() || isOwner(resource.data.pacienteId); 
-      allow create: if isMedico(); 
-      allow update, delete: if isMedico(); // o, más fino, if isMedico() && request.auth.uid == resource.data.medicoId
+      allow read: if isMedico() || isOwner(resource.data.pacienteId);
+      allow create: if isMedico();
+      allow update, delete: if isMedico();
+    }
+
+    // (opcional) invites en inglés
+    match /invites/{inviteId} {
+      allow create, read, update, delete: if isMedico();
+    }
+
+    // ───────── invitaciones (tu colección) ─────────
+    match /invitaciones/{inviteId} {
+      // crear invitación: médico autenticado + validación básica
+      allow create: if isMedico()
+                    && request.resource.data.email is string
+                    && request.resource.data.nombre is string
+                    && request.resource.data.apellido is string
+                    && (request.resource.data.dni is string || request.resource.data.dni is int);
+
+      // leer/actualizar/borrar: médicos o el creador de la invitación
+      allow read, update, delete:
+        if isMedico() || (isSignedIn() && resource.data.creadoPor == request.auth.uid);
     }
   }
 }

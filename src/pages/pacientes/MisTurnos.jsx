@@ -105,7 +105,7 @@ export default function MisTurnos() {
 
       {/* Tabs */}
       <div style={{ display:"flex", gap:8 }}>
-        {["todas","pendiente","propuesta","confirmada"].map(t => (
+        {["todas","pendiente de ver por el médico","propuesta de horario por parte del médico","confirmada"].map(t => (
           <button
             key={t}
             className={`btn ${tab === t ? "btn-primary" : "btn-outline"}`}

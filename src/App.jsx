@@ -1,4 +1,3 @@
-// App.jsx
 import { Routes, Route, Navigate } from "react-router-dom";
 import Header from "./components/Header.jsx";
 import { ProtectedRoute } from "./auth/ProtectedRoute.jsx";
@@ -25,6 +24,7 @@ import Pacientes from "./pages/medico/Pacientes.jsx";
 import InvitarPaciente from "./pages/medico/InvitarPaciente.jsx";
 import PacienteFicha from "./pages/medico/PacienteFicha.jsx";
 
+// Admin
 import AdminSetMedico from "./pages/AdminSetMedico.jsx";
 
 export default function App() {
@@ -37,7 +37,7 @@ export default function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/onboarding" element={<Onboarding />} />
 
-        {/* Redirect raíz según rol */}
+        {/* Raíz: redirige por rol SOLO acá */}
         <Route
           path="/"
           element={
@@ -48,44 +48,106 @@ export default function App() {
         />
 
         {/* Paciente */}
-        <Route path="/paciente" element={
-          <ProtectedRoute><HomePaciente /></ProtectedRoute>
-        } />
-        <Route path="/paciente/solicitar-turno" element={
-          <ProtectedRoute><SolicitarTurno /></ProtectedRoute>
-        } />
-        <Route path="/paciente/mis-turnos" element={
-          <ProtectedRoute><MisTurnos /></ProtectedRoute>
-        } />
-        <Route path="/paciente/perfil" element={
-          <ProtectedRoute><PerfilPaciente /></ProtectedRoute>
-        } />
+        <Route
+          path="/paciente"
+          element={
+            <ProtectedRoute>
+              <HomePaciente />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/paciente/solicitar-turno"
+          element={
+            <ProtectedRoute>
+              <SolicitarTurno />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/paciente/mis-turnos"
+          element={
+            <ProtectedRoute>
+              <MisTurnos />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/paciente/perfil"
+          element={
+            <ProtectedRoute>
+              <PerfilPaciente />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Médico */}
-        <Route path="/medico" element={
-          <MedicoRoute><DashboardMedico /></MedicoRoute>
-        } />
-        <Route path="/medico/disponibilidad" element={
-          <MedicoRoute><Disponibilidad /></MedicoRoute>
-        } />
-        <Route path="/medico/solicitudes" element={
-          <MedicoRoute><Solicitudes /></MedicoRoute>
-        } />
-        <Route path="/medico/turnos" element={
-          <MedicoRoute><TurnosConfirmados /></MedicoRoute>
-        } />
-        <Route path="/medico/pacientes" element={
-          <MedicoRoute><Pacientes /></MedicoRoute>
-        } />
-        <Route path="/medico/invitar" element={
-          <MedicoRoute><InvitarPaciente /></MedicoRoute>
-        } />
-        <Route path="/medico/paciente/:id" element={<PacienteFicha />} />
+        <Route
+          path="/medico"
+          element={
+            <MedicoRoute>
+              <DashboardMedico />
+            </MedicoRoute>
+          }
+        />
+        <Route
+          path="/medico/disponibilidad"
+          element={
+            <MedicoRoute>
+              <Disponibilidad />
+            </MedicoRoute>
+          }
+        />
+        <Route
+          path="/medico/solicitudes"
+          element={
+            <MedicoRoute>
+              <Solicitudes />
+            </MedicoRoute>
+          }
+        />
+        <Route
+          path="/medico/turnos"
+          element={
+            <MedicoRoute>
+              <TurnosConfirmados />
+            </MedicoRoute>
+          }
+        />
+        <Route
+          path="/medico/pacientes"
+          element={
+            <MedicoRoute>
+              <Pacientes />
+            </MedicoRoute>
+          }
+        />
+        <Route
+          path="/medico/invitar"
+          element={
+            <MedicoRoute>
+              <InvitarPaciente />
+            </MedicoRoute>
+          }
+        />
+        <Route
+          path="/medico/paciente/:id"
+          element={
+            <MedicoRoute>
+              <PacienteFicha />
+            </MedicoRoute>
+          }
+        />
 
         {/* Admin */}
-        <Route path="/admin/set-medico" element={
-          <ProtectedRoute><AdminSetMedico /></ProtectedRoute>
-        } />
+        <Route
+          path="/admin/set-medico"
+          element={
+            <ProtectedRoute>
+              <AdminSetMedico />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

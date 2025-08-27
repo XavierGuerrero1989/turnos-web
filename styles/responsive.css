@@ -1,0 +1,53 @@
+/* src/styles/responsive.css */
+:root{
+  --bp-sm: 480px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+}
+
+/* contenedor */
+.container{max-width:1100px;margin:0 auto;padding:12px;}
+.form-narrow{width:100%;max-width:520px}
+
+/* filas de botones y listas */
+.btn-row{display:flex;flex-wrap:wrap;gap:8px}
+.item{padding:8px;border-radius:12px;background:var(--surface-2, transparent)}
+
+/* === Grillas utilitarias (mobile-first) === */
+.kpi-grid{display:grid;grid-template-columns:1fr;gap:12px}
+@media (min-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+@media (min-width:1024px){.kpi-grid{grid-template-columns:repeat(4,1fr)}}
+
+.two-col{display:grid;grid-template-columns:1fr;gap:12px}
+@media (min-width:900px){.two-col{grid-template-columns:1fr 1fr}}
+
+.cards-auto{display:grid;gap:12px;grid-template-columns:1fr}
+@media (min-width:900px){.cards-auto{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* inputs y tablas */
+.input{width:100%}
+.table-wrap{overflow-x:auto}
+
+/* === Header responsive === */
+.header{position:sticky;top:0;z-index:20;background:var(--surface,#fff);border-bottom:1px solid var(--border,#eee)}
+.header-inner{display:flex;align-items:center;gap:12px;padding:10px 12px}
+.brand{display:flex;align-items:center;gap:8px;text-decoration:none}
+.brand-badge{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:8px;font-weight:700;background:#8a2be2;color:#fff}
+
+.header .spacer{flex:1}
+.nav-links{display:none;gap:12px;align-items:center}
+.menu-btn{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border,#e6e6e6);border-radius:12px;padding:8px;background:transparent}
+.menu-btn span{display:block;width:18px;height:2px;background:currentColor;margin:3px 0;border-radius:2px}
+
+.mobile-menu{display:none;flex-direction:column;gap:8px;padding:10px 12px;border-top:1px solid var(--border,#eee);background:var(--surface,#fff)}
+.header.is-open + .mobile-menu{display:flex}
+
+@media (min-width:900px){
+  .nav-links{display:flex}
+  .menu-btn{display:none}
+  .mobile-menu{display:none !important}
+}
+
+/* pequeñas mejoras en tarjetas */
+.card{border-radius:16px;border:1px solid var(--border,#eee);padding:12px;background:var(--surface,#fff);box-shadow:0 1px 2px rgba(0,0,0,.03)}
+.muted{color:var(--muted,#667085);font-size:.9rem}

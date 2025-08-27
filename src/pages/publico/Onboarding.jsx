@@ -1,81 +1,229 @@
-// src/pages/Onboarding.jsx
-import { useEffect, useState } from "react";
-import { isSignInWithEmailLink, signInWithEmailLink, updatePassword, updateProfile } from "firebase/auth";
-import { auth, db } from "../../firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import Swal from "sweetalert2";
+// src/pages/publico/Onboarding.jsx
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { auth, db } from "../../firebase.js";
+import {
+  isSignInWithEmailLink,
+  signInWithEmailLink,
+  updatePassword,
+} from "firebase/auth";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp,
+} from "firebase/firestore";
+
+import Card from "../../components/ui/Card.jsx";
+import Input from "../../components/ui/Input.jsx";
+import Button from "../../components/ui/Button.jsx";
+import { useAuth } from "../../auth/AuthProvider.jsx";
 
 export default function Onboarding() {
-  const [email, setEmail] = useState("");
-  const [form, setForm] = useState({ nombre:"", dni:"", telefono:"", password:"" });
-  const [step, setStep] = useState("confirm"); // confirm → datos
+  const nav = useNavigate();
+  const [sp] = useSearchParams();
+  const { loading, user, role } = useAuth();
+
+  const href = typeof window !== "undefined" ? window.location.href : "";
+  const linkValido = useMemo(() => isSignInWithEmailLink(auth, href), [href]);
+
+  // email tomado del query param ?email=
+  const linkEmail = useMemo(() => {
+    const raw = sp.get("email");
+    try { return raw ? decodeURIComponent(raw).toLowerCase() : ""; } catch { return raw || ""; }
+  }, [sp]);
+
+  const [email, setEmail] = useState(linkEmail || "");
+  const [askPassword, setAskPassword] = useState(true);   // permitir crear password ahora
+  const [pass, setPass] = useState("");
+  const [pass2, setPass2] = useState("");
+  const [working, setWorking] = useState(false);
   const [err, setErr] = useState("");
 
+  // si ya está logueado, redirigir por rol
   useEffect(() => {
-    if (isSignInWithEmailLink(auth, window.location.href)) {
-      const stored = window.localStorage.getItem("emailForSignIn");
-      if (stored) setEmail(stored);
+    if (loading) return;
+    if (user && role) {
+      const isMedico = String(role).toLowerCase().startsWith("medic");
+      nav(isMedico ? "/medico" : "/paciente", { replace: true });
     }
-  }, []);
+  }, [loading, user, role, nav]);
 
-  const confirmar = async e => {
-    e.preventDefault(); setErr("");
+  const mensajeLink = useMemo(() => {
+    if (linkValido) return "";
+    return "El enlace es inválido o expiró. Pedí uno nuevo o volvé a iniciar sesión.";
+  }, [linkValido]);
+
+  const crearPerfilSiFalta = async (u) => {
     try {
-      await signInWithEmailLink(auth, email, window.location.href);
-      window.localStorage.removeItem("emailForSignIn");
-      setStep("datos");
-    } catch (e) { setErr(e.message); }
+      const ref = doc(db, "usuarios", u.uid);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) {
+        await setDoc(ref, {
+          email: u.email || email,
+          role: "paciente",
+          nombre: "",
+          apellido: "",
+          dni: "",
+          hasPassword: false,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+      }
+    } catch (e) {
+      console.warn("crearPerfilSiFalta:", e);
+    }
   };
 
-  const guardar = async e => {
-    e.preventDefault(); setErr("");
+  const setHasPasswordFlag = async (u, value) => {
     try {
-      if (!auth.currentUser) throw new Error("No autenticado");
-      const uid = auth.currentUser.uid;
+      const ref = doc(db, "usuarios", u.uid);
+      await setDoc(ref, { hasPassword: !!value, updatedAt: serverTimestamp() }, { merge: true });
+    } catch (e) {
+      console.warn("setHasPasswordFlag:", e);
+    }
+  };
 
-      await updateProfile(auth.currentUser, { displayName: form.nombre });
+  const validarPassword = (p, p2) => {
+    if (!askPassword) return null; // no se pide
+    if (!p) return "Elegí una contraseña.";
+    if (p.length < 8) return "La contraseña debe tener al menos 8 caracteres.";
+    // opcional: fuerza mínima
+    const tieneNum = /\d/.test(p);
+    const tieneLetra = /[A-Za-z]/.test(p);
+    if (!tieneNum || !tieneLetra) return "Usá letras y números.";
+    if (p !== p2) return "Las contraseñas no coinciden.";
+    return null;
+    // Si querés reglas más duras (símbolo, mayúscula, etc.), las añadimos.
+  };
 
-      await setDoc(doc(db, "usuarios", uid), {
-        email: auth.currentUser.email,
-        role: "paciente",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
+  const submit = async (e) => {
+    e?.preventDefault?.();
+    setErr("");
 
-      await setDoc(doc(db, "perfiles", uid), {
-        ...form,
-        completed: true,
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
+    if (!linkValido) {
+      setErr(mensajeLink);
+      return;
+    }
+    if (!email) {
+      setErr("Ingresá tu email para completar el acceso.");
+      return;
+    }
+    const errPass = validarPassword(pass, pass2);
+    if (errPass) {
+      setErr(errPass);
+      return;
+    }
 
-      if (form.password) {
-        await updatePassword(auth.currentUser, form.password);
+    setWorking(true);
+    try {
+      // 1) completar el sign in con el link mágico
+      const cred = await signInWithEmailLink(auth, email, href);
+
+      // 2) crear perfil si no existe
+      await crearPerfilSiFalta(cred.user);
+
+      // 3) si el usuario decidió crear password ahora, lo seteamos
+      if (askPassword) {
+        await updatePassword(cred.user, pass); // requiere login reciente: acá lo tenemos
+        await setHasPasswordFlag(cred.user, true);
       }
 
-      Swal.fire("¡Listo!", "Tu cuenta fue creada, ya podés ingresar.", "success");
-    } catch (e) { setErr(e.message); }
+      // 4) dejamos que el router redirija por rol
+      nav("/", { replace: true });
+    } catch (e) {
+      let msg = e?.message || "No se pudo completar el acceso.";
+      if (e?.code === "auth/invalid-action-code") msg = "El enlace expiró o ya fue usado.";
+      if (e?.code === "auth/invalid-email") msg = "El email ingresado no es válido.";
+      if (e?.code === "auth/weak-password") msg = "La contraseña es muy débil.";
+      if (e?.code === "auth/requires-recent-login") msg = "Por seguridad, volvé a abrir el enlace para configurar tu contraseña.";
+      setErr(msg);
+      setWorking(false);
+    }
   };
 
-  if (step === "confirm") {
-    return (
-      <form onSubmit={confirmar}>
-        <h2>Confirmar email</h2>
-        <input placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} />
-        <button>Confirmar</button>
-        {err && <p>{err}</p>}
-      </form>
-    );
-  }
+  if (loading) return null;
 
   return (
-    <form onSubmit={guardar}>
-      <h2>Completar datos</h2>
-      <input name="nombre" placeholder="Nombre completo" value={form.nombre} onChange={e=>setForm({...form, nombre:e.target.value})} />
-      <input name="dni" placeholder="DNI" value={form.dni} onChange={e=>setForm({...form, dni:e.target.value})} />
-      <input name="telefono" placeholder="Teléfono" value={form.telefono} onChange={e=>setForm({...form, telefono:e.target.value})} />
-      <input name="password" type="password" placeholder="Contraseña" value={form.password} onChange={e=>setForm({...form, password:e.target.value})} />
-      <button>Guardar</button>
-      {err && <p>{err}</p>}
-    </form>
+    <div className="center-screen">
+      <Card className="form-narrow">
+        <div className="stack-lg">
+          <div style={{ textAlign: "center" }}>
+            <div className="brand" style={{ justifyContent: "center", marginBottom: 8 }}>
+              <span className="brand-badge">Tx</span>
+              <span>Turnos</span>
+            </div>
+            <h2 style={{ margin: "0 0 4px" }}>Confirmar email</h2>
+            <p className="helper">
+              {linkValido
+                ? "Ingresá tu correo para completar el acceso con el enlace. Podés crear una contraseña ahora."
+                : mensajeLink}
+            </p>
+          </div>
+
+          <form onSubmit={submit} className="stack-lg">
+            <Input
+              id="email"
+              label="Correo electrónico"
+              type="email"
+              placeholder="tu@correo.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              disabled={!linkValido || working}
+            />
+
+            {/* Toggle para crear contraseña ahora */}
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+              <input
+                type="checkbox"
+                checked={askPassword}
+                onChange={(e) => setAskPassword(e.target.checked)}
+                disabled={!linkValido || working}
+              />
+              Crear una contraseña ahora (opcional)
+            </label>
+
+            {askPassword && (
+              <>
+                <Input
+                  id="password"
+                  label="Contraseña"
+                  type="password"
+                  placeholder="Mínimo 8 caracteres"
+                  value={pass}
+                  onChange={(e) => setPass(e.target.value)}
+                  required
+                  disabled={!linkValido || working}
+                />
+                <Input
+                  id="password2"
+                  label="Confirmar contraseña"
+                  type="password"
+                  placeholder="Repetí tu contraseña"
+                  value={pass2}
+                  onChange={(e) => setPass2(e.target.value)}
+                  required
+                  disabled={!linkValido || working}
+                />
+              </>
+            )}
+
+            {err && <div className="error">{err}</div>}
+
+            <div className="btn-row">
+              <Button type="submit" disabled={!linkValido || working}>
+                {working ? "Confirmando..." : "Confirmar"}
+              </Button>
+              <Link to="/login" className="btn btn-outline">Volver a Login</Link>
+            </div>
+          </form>
+
+          <p className="helper">
+            Abriste un enlace de acceso por correo. Si no lo solicitaste vos, ignorá el mensaje.
+          </p>
+        </div>
+      </Card>
+    </div>
   );
 }

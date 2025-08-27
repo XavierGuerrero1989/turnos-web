@@ -49,8 +49,8 @@ export default function Login() {
         <div className="stack-lg">
           <div style={{ textAlign:"center" }}>
             <div className="brand" style={{ justifyContent:"center", marginBottom:8 }}>
-              <span className="brand-badge">Tx</span>
-              <span>Turnos</span>
+              <span className="brand-badge">Gt</span>
+              <span>GineTurnos</span>
             </div>
             <h2 style={{ margin:"0 0 4px" }}>Iniciar sesión</h2>
             <p className="helper">Entrá con tu correo y contraseña</p>

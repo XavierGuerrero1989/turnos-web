@@ -38,8 +38,8 @@ export default function Header() {
       <header className={`header ${open ? "is-open": ""}`}>
         <div className="header-inner">
           <Link to={role === "medico" ? "/medico" : "/"} className="brand">
-            <span className="brand-badge">Tx</span>
-            <span>Turnos</span>
+            <span className="brand-badge">Gt</span>
+            <span>GineTurnos</span>
           </Link>
 
           {!loading && user && (

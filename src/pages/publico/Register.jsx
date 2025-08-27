@@ -65,8 +65,8 @@ export default function Register() {
           <div style={{
             background:"var(--primary)", color:"#fff", fontWeight:700,
             borderRadius:10, width:36, height:36, display:"grid", placeItems:"center", marginRight:10
-          }}>Tx</div>
-          <h2 style={{ margin:0 }}>Turnos</h2>
+          }}>Gt</div>
+          <h2 style={{ margin:0 }}>GineTurnos</h2>
         </div>
 
         <h3 style={{ textAlign:"center", margin:"0 0 14px" }}>Crear cuenta</h3>

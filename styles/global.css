@@ -197,3 +197,8 @@ a.btn { text-decoration: none; }
 /* Helpers */
 .helper{text-align:center; color:var(--muted); font-size:.92rem}
 .error{color:#b91c1c; font-size:.9rem}
+
+.link-recupero{
+  display:inline-block;   /* o block */
+  margin-top:12px;        /* ahora sí separa de los botones */
+}

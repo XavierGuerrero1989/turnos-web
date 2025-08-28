@@ -87,7 +87,8 @@ export default function Login() {
             </div>
           </form>
 
-          <p className="helper">¿Olvidaste tu contraseña? (lo sumamos luego)</p>
+          <Link to="/recuperar" className="link-recupero">¿Olvidaste tu contraseña?</Link>
+
         </div>
       </Card>
     </div>

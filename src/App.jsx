@@ -8,6 +8,9 @@ import RedirectByRole from "./auth/RedirectByRole.jsx";
 import Login from "./pages/publico/Login.jsx";
 import Register from "./pages/publico/Register.jsx";
 import Onboarding from "./pages/publico/Onboarding.jsx";
+import RecuperarPassword from "./pages/publico/RecuperarPassword.jsx";
+import Terminos from "./pages/legal/Terminos.jsx";
+import Privacidad from "./pages/legal/Privacidad.jsx";
 
 // Paciente
 import HomePaciente from "./pages/pacientes/HomePaciente.jsx";
@@ -151,6 +154,11 @@ export default function App() {
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
+
+        <Route path="/recuperar" element={<RecuperarPassword />} />
+
+        <Route path="/terminos" element={<Terminos />} />
+<Route path="/privacidad" element={<Privacidad />} />
       </Routes>
     </>
   );

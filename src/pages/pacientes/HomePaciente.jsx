@@ -2,9 +2,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../auth/AuthProvider.jsx";
 import { db } from "../../firebase.js";
-import { doc, getDoc, collection, query, where, onSnapshot, updateDoc } from "firebase/firestore";
+import {
+  doc, getDoc, collection, query, where, onSnapshot, updateDoc,
+  setDoc, serverTimestamp
+} from "firebase/firestore";
 import Swal from "sweetalert2";
 import { Navigate, Link } from "react-router-dom";
+import TermsModal from "../../shared/TermsModal.jsx";
 
 export default function HomePaciente() {
   // ✅ Un solo useAuth: traemos todo junto
@@ -13,6 +17,10 @@ export default function HomePaciente() {
   const [perfil, setPerfil] = useState(null);
   const [sols, setSols] = useState([]);
   const [busyId, setBusyId] = useState(null);
+
+  // ⬇️ Estado para términos (sin versionado)
+  const [mustAccept, setMustAccept] = useState(false);
+  const [loadingTerms, setLoadingTerms] = useState(true);
 
   // ⛔ Mientras carga auth, no mostramos nada (evita parpadeos)
   if (loading) return null;
@@ -43,6 +51,49 @@ export default function HomePaciente() {
     );
     return () => unsub();
   }, [user]);
+
+  // 🔒 Chequeo de términos (solo aceptación booleana)
+  useEffect(() => {
+    const checkTerms = async () => {
+      if (!user?.uid) return;
+      try {
+        const uref = doc(db, "usuarios", user.uid);
+        const snap = await getDoc(uref);
+        const data = snap.data() || {};
+        const accepted = data?.terminos?.aceptado === true;
+        setMustAccept(!accepted);
+      } catch (e) {
+        console.error(e);
+        // si falla, por seguridad pedimos aceptación
+        setMustAccept(true);
+      } finally {
+        setLoadingTerms(false);
+      }
+    };
+    checkTerms();
+  }, [user?.uid]);
+
+  const handleAcceptTerms = async () => {
+    if (!user?.uid) return;
+    try {
+      const uref = doc(db, "usuarios", user.uid);
+      await setDoc(
+        uref,
+        {
+          terminos: {
+            aceptado: true,
+            acceptedAt: serverTimestamp(),
+          },
+        },
+        { merge: true }
+      );
+      setMustAccept(false);
+      Swal.fire("Listo ✅", "Aceptaste los Términos y la Privacidad.", "success");
+    } catch (e) {
+      console.error(e);
+      Swal.fire("Error", e.message || "No pudimos registrar tu aceptación.", "error");
+    }
+  };
 
   const propuestas = useMemo(
     () => sols.filter((s) => s.estado === "propuesta"),
@@ -110,6 +161,11 @@ export default function HomePaciente() {
 
   return (
     <div className="container" style={{ display: "grid", gap: 12 }}>
+      {/* Modal de Términos: aparece sólo si falta aceptar y ya cargó el chequeo */}
+      {!loadingTerms && mustAccept && (
+        <TermsModal onAccept={handleAcceptTerms} />
+      )}
+
       <h2>
         Hola {perfil ? `${perfil.nombre} ${perfil.apellido}` : user?.email || "Paciente"} 👋
       </h2>

@@ -6,6 +6,12 @@ import { doc, addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { sendSignInLinkToEmail } from "firebase/auth";
 import Swal from "sweetalert2";
 
+const APP_URL = import.meta.env.VITE_APP_URL || window.location.origin;
+const actionCodeSettings = {
+  url: `${APP_URL}/onboarding`,
+  handleCodeInApp: true
+};
+
 export default function InvitarPaciente() {
   const { user } = useAuth(); // médico
   const [form, setForm] = useState({

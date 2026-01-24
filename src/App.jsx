@@ -26,6 +26,8 @@ import TurnosConfirmados from "./pages/medico/TurnosConfirmados.jsx";
 import Pacientes from "./pages/medico/Pacientes.jsx";
 import InvitarPaciente from "./pages/medico/InvitarPaciente.jsx";
 import PacienteFicha from "./pages/medico/PacienteFicha.jsx";
+import RecetasMedico from "./pages/medico/RecetasMedico.jsx";
+
 
 // Admin
 import AdminSetMedico from "./pages/AdminSetMedico.jsx";
@@ -125,6 +127,8 @@ export default function App() {
             </MedicoRoute>
           }
         />
+        <Route path="/medico/recetas" element={<RecetasMedico />} />
+
         <Route
           path="/medico/invitar"
           element={

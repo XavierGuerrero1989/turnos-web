@@ -3,20 +3,32 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../auth/AuthProvider.jsx";
 import { db } from "../../firebase.js";
 import {
-  doc, getDoc, collection, query, where, onSnapshot, updateDoc,
-  setDoc, serverTimestamp
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  onSnapshot,
+  updateDoc,
+  setDoc,
+  serverTimestamp,
+  addDoc,
 } from "firebase/firestore";
 import Swal from "sweetalert2";
-import { Navigate, Link } from "react-router-dom";
+import { Navigate, Link, useLocation } from "react-router-dom";
 import TermsModal from "../../shared/TermsModal.jsx";
 
 export default function HomePaciente() {
   // ✅ Un solo useAuth: traemos todo junto
   const { user, role, loading } = useAuth();
+  const loc = useLocation();
 
   const [perfil, setPerfil] = useState(null);
   const [sols, setSols] = useState([]);
   const [busyId, setBusyId] = useState(null);
+
+  // 🧾 Recetas
+  const [recetas, setRecetas] = useState([]);
 
   // ⬇️ Estado para términos (sin versionado)
   const [mustAccept, setMustAccept] = useState(false);
@@ -38,7 +50,7 @@ export default function HomePaciente() {
       .then((snap) => setPerfil(snap.data() || null))
       .catch(console.error);
 
-    // Mis solicitudes
+    // Mis solicitudes (turnos)
     const qRef = query(collection(db, "solicitudes"), where("pacienteId", "==", user.uid));
     const unsub = onSnapshot(
       qRef,
@@ -49,7 +61,23 @@ export default function HomePaciente() {
       },
       console.error
     );
-    return () => unsub();
+
+    // Mis recetas
+    const qRec = query(collection(db, "recetas"), where("pacienteId", "==", user.uid));
+    const unsubRec = onSnapshot(
+      qRec,
+      (snap) => {
+        const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        arr.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+        setRecetas(arr);
+      },
+      console.error
+    );
+
+    return () => {
+      unsub();
+      unsubRec();
+    };
   }, [user]);
 
   // 🔒 Chequeo de términos (solo aceptación booleana)
@@ -95,10 +123,17 @@ export default function HomePaciente() {
     }
   };
 
-  const propuestas = useMemo(
-    () => sols.filter((s) => s.estado === "propuesta"),
-    [sols]
-  );
+  // ✅ Scroll a la card cuando viene #receta (desde nav o desde otra pantalla)
+  useEffect(() => {
+    if (loc.hash !== "#receta") return;
+    const t = setTimeout(() => {
+      const el = document.getElementById("receta");
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+    return () => clearTimeout(t);
+  }, [loc.hash]);
+
+  const propuestas = useMemo(() => sols.filter((s) => s.estado === "propuesta"), [sols]);
 
   const confirmadasFuturas = useMemo(() => {
     const today = new Date();
@@ -119,6 +154,18 @@ export default function HomePaciente() {
 
   const proxima = confirmadasFuturas[0] || null;
   const recientes = sols.slice(0, 5);
+
+  // 🧾 Receta activa (solicitada)
+  const recetaActiva = useMemo(
+    () => recetas.find((r) => String(r.estado || "").toLowerCase() === "solicitada") || null,
+    [recetas]
+  );
+
+  // 🧾 Historial (entregadas)
+  const recetasHistoricas = useMemo(
+    () => recetas.filter((r) => String(r.estado || "").toLowerCase() === "entregada"),
+    [recetas]
+  );
 
   const aceptar = async (sol) => {
     setBusyId(sol.id);
@@ -159,12 +206,151 @@ export default function HomePaciente() {
     }
   };
 
+  // 🧾 Abrir modal para solicitar receta (Swal)
+  const abrirModalReceta = async () => {
+    if (!user?.uid) return;
+
+    if (!loadingTerms && mustAccept) {
+      Swal.fire(
+        "Falta aceptar términos",
+        "Para solicitar una receta, aceptá Términos y Privacidad.",
+        "warning"
+      );
+      return;
+    }
+
+    if (recetaActiva) {
+      Swal.fire(
+        "Solicitud en curso",
+        "Ya tenés una solicitud de receta en curso. Esperá la respuesta de la doctora.",
+        "info"
+      );
+      return;
+    }
+
+    const html = `
+      <div style="text-align:left; display:grid; gap:10px;">
+        <div style="font-size:14px; line-height:1.4;">
+          <b>Receta ginecológica online</b><br/>
+          Completá los datos para solicitar tu receta.
+        </div>
+
+        <div>
+          <label style="font-size:13px; display:block; margin-bottom:6px;">Obra social</label>
+          <select id="obraSocial" class="swal2-input" style="width:100%; margin:0;">
+            <option value="IOMA">IOMA</option>
+            <option value="OTRAS">Otras</option>
+          </select>
+        </div>
+
+        <div id="dniWrap">
+          <label style="font-size:13px; display:block; margin-bottom:6px;">DNI</label>
+          <input id="dni" class="swal2-input" style="width:100%; margin:0;" placeholder="Ingresá tu DNI" />
+        </div>
+
+        <div>
+          <label style="font-size:13px; display:block; margin-bottom:6px;">Indicar medicación ginecológica solicitada</label>
+          <textarea id="medicacion" class="swal2-textarea" style="width:100%; margin:0;" placeholder="Ej: nombre, dosis, presentación..."></textarea>
+        </div>
+
+        <div style="font-size:12px; opacity:.85;">
+          ⏱️ Demora estimada: según disponibilidad.<br/>
+          💲 Costo: según indicación de la doctora.
+        </div>
+      </div>
+    `;
+
+    await Swal.fire({
+      title: "Solicitar receta",
+      html,
+      showCancelButton: true,
+      confirmButtonText: "Enviar",
+      cancelButtonText: "Cancelar",
+      focusConfirm: false,
+      didOpen: () => {
+        const sel = document.getElementById("obraSocial");
+        const dniWrap = document.getElementById("dniWrap");
+
+        const toggle = () => {
+          const v = sel?.value || "IOMA";
+          if (dniWrap) dniWrap.style.display = v === "IOMA" ? "block" : "none";
+        };
+
+        if (sel) sel.addEventListener("change", toggle);
+        toggle();
+      },
+      preConfirm: () => {
+        const obraSocial = document.getElementById("obraSocial")?.value || "IOMA";
+        const dni = (document.getElementById("dni")?.value || "").trim();
+        const medicacionSolicitada = (document.getElementById("medicacion")?.value || "").trim();
+
+        if (!medicacionSolicitada) {
+          Swal.showValidationMessage("Indicá la medicación solicitada.");
+          return false;
+        }
+        if (obraSocial === "IOMA" && !dni) {
+          Swal.showValidationMessage("Ingresá tu DNI (IOMA).");
+          return false;
+        }
+
+        return { obraSocial, dni, medicacionSolicitada };
+      },
+    }).then(async (res) => {
+      if (!res.isConfirmed || !res.value) return;
+
+      const { obraSocial, dni, medicacionSolicitada } = res.value;
+
+      try {
+        await addDoc(collection(db, "recetas"), {
+          pacienteId: user.uid,
+          pacienteEmail: (perfil?.email || user.email || "").toLowerCase(),
+          pacienteNombre: perfil ? `${perfil.nombre || ""} ${perfil.apellido || ""}`.trim() : "",
+          obraSocial,
+          dni: obraSocial === "IOMA" ? dni : "",
+          medicacionSolicitada,
+          estado: "solicitada",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+
+        if (obraSocial === "IOMA") {
+          await Swal.fire("Solicitud enviada ✅", "Tu solicitud de receta fue enviada con éxito.", "success");
+        } else {
+          await Swal.fire({
+            title: "Información",
+            icon: "info",
+            html: `
+              <div style="text-align:left; line-height:1.6;">
+                <p>Si es su primera solicitud de receta, por favor ingresar al siguiente link y completar sus datos personales a la mayor brevedad posible.</p>
+                <p>
+                  <a href="https://app.rcta.me/patients/5a2aa02e6105ae448d2999b56a0214a5ea19868a" target="_blank" rel="noreferrer">
+                    https://app.rcta.me/patients/5a2aa02e6105ae448d2999b56a0214a5ea19868a
+                  </a>
+                </p>
+              </div>
+            `,
+            confirmButtonText: "Entendido",
+          });
+        }
+      } catch (e) {
+        console.error(e);
+        Swal.fire("Error", e.message || "No se pudo enviar la solicitud de receta.", "error");
+      }
+    });
+  };
+
+  const fmtDateTime = (ts) => {
+    try {
+      return ts?.toDate?.() ? ts.toDate().toLocaleString() : "";
+    } catch {
+      return "";
+    }
+  };
+
   return (
     <div className="container" style={{ display: "grid", gap: 12 }}>
       {/* Modal de Términos: aparece sólo si falta aceptar y ya cargó el chequeo */}
-      {!loadingTerms && mustAccept && (
-        <TermsModal onAccept={handleAcceptTerms} />
-      )}
+      {!loadingTerms && mustAccept && <TermsModal onAccept={handleAcceptTerms} />}
 
       <h2>
         Hola {perfil ? `${perfil.nombre} ${perfil.apellido}` : user?.email || "Paciente"} 👋
@@ -191,20 +377,20 @@ export default function HomePaciente() {
               Swal.fire({
                 title: "Pago de la consulta",
                 html: `
-            <div style="text-align:left; line-height:1.6">
-              <p>⚠️ Recordá realizar el pago de tu consulta:</p>
-              <ul>
-                <li><b>$20.000</b> — Consulta Ginecológica</li>
-                <li><b>$30.000</b> — Consulta de Fertilidad</li>
-              </ul>
-              <p><b>Alias:</b> DRAYRODRIGUEZ.MP</p>
-              <p style="margin-top:10px">
-                📌 <b>Importante:</b><br/>
-                Enviá el comprobante de pago hasta 24 horas antes de tu turno.<br/>
-                Si no lo recibimos en ese plazo, el turno se considerará <b>cancelado</b>.
-              </p>
-            </div>
-          `,
+                  <div style="text-align:left; line-height:1.6">
+                    <p>⚠️ Recordá realizar el pago de tu consulta:</p>
+                    <ul>
+                      <li><b>$30.000</b> — Consulta Ginecológica</li>
+                      <li><b>$40.000</b> — Consulta de Fertilidad</li>
+                    </ul>
+                    <p><b>Alias:</b> DRAYRODRIGUEZ.MP</p>
+                    <p style="margin-top:10px">
+                      📌 <b>Importante:</b><br/>
+                      Enviá el comprobante de pago a la casilla drayaninarodriguez@gmail.com hasta 24 horas antes de tu turno.<br/>
+                      Si no lo recibimos en ese plazo, el turno se considerará <b>cancelado</b>.
+                    </p>
+                  </div>
+                `,
                 confirmButtonText: "Entendido",
                 icon: "warning",
               });
@@ -216,12 +402,10 @@ export default function HomePaciente() {
         <ul style={{ paddingLeft: "20px", margin: 0 }}>
           <li>Recordá estar lista 5 minutos antes de tu cita.</li>
           <li>
-            La doctora te enviará el link de la videollamada por mail a la casilla que nos
-            informaste.
+            La doctora te enviará el link de la videollamada por mail a la casilla que nos informaste.
           </li>
           <li>
-            Si no enviás el comprobante de pago al mail de la doctora, el turno se considera
-            cancelado.
+            Si no enviás el comprobante de pago al mail de la doctora, el turno se considera cancelado.
           </li>
         </ul>
       </div>
@@ -251,6 +435,91 @@ export default function HomePaciente() {
         )}
       </div>
 
+      {/* 🧾 Receta ginecológica online (Opción A) */}
+      <div
+        id="receta"
+        className="card"
+        style={{
+          scrollMarginTop: 90, // por si tu header es fijo
+          border: "1px solid var(--border)",
+        }}
+      >
+        <h3 style={{ marginTop: 0 }}>Receta ginecológica online</h3>
+
+        {!recetaActiva ? (
+          <>
+            <div className="helper" style={{ marginBottom: 10 }}>
+              Podés solicitar tu receta sin pedir un turno. Te informaremos cuando esté lista.
+            </div>
+            <button className="btn btn-primary" onClick={abrirModalReceta}>
+              Solicitar receta
+            </button>
+          </>
+        ) : (
+          <>
+            <div style={{ marginBottom: 8 }}>
+              Tenés una solicitud en curso: <b>{String(recetaActiva.estado || "").toLowerCase()}</b>
+            </div>
+            <div className="helper" style={{ marginBottom: 10 }}>
+              Obra social: <b>{recetaActiva.obraSocial}</b>
+            </div>
+            <button
+              className="btn btn-outline"
+              onClick={() =>
+                Swal.fire(
+                  "Solicitud en curso",
+                  "Ya tenés una solicitud de receta en curso. Esperá la respuesta de la doctora.",
+                  "info"
+                )
+              }
+            >
+              Ver estado
+            </button>
+          </>
+        )}
+
+        {/* 📁 Historial de recetas entregadas */}
+        {recetasHistoricas.length > 0 && (
+          <>
+            <hr style={{ margin: "14px 0" }} />
+            <h4 style={{ margin: "0 0 8px" }}>Solicitudes anteriores</h4>
+
+            <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 }}>
+              {recetasHistoricas.map((r) => {
+                const obra = String(r.obraSocial || "").toUpperCase();
+                const isIoma = obra === "IOMA";
+                const deliveredLabel = fmtDateTime(r.deliveredAt);
+
+                return (
+                  <li
+                    key={r.id}
+                    className="item"
+                    style={{ display: "grid", gap: 6 }}
+                  >
+                    <div>
+                      <strong>{r.medicacionSolicitada || "—"}</strong>
+                    </div>
+
+                    <div className="muted" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      <span>Obra social: <b>{obra || "-"}</b></span>
+                      {isIoma && r.dni ? <span>DNI: <b>{r.dni}</b></span> : null}
+                    </div>
+
+                    <div className="muted">
+                      {deliveredLabel ? (
+                        <>Entregada el <b>{deliveredLabel}</b></>
+                      ) : (
+                        <>Entregada</>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
+      </div>
+
       {/* Propuestas pendientes */}
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Propuestas del médico pendientes de confirmación</h3>
@@ -274,15 +543,22 @@ export default function HomePaciente() {
                   {sol.propuesta?.franja === "manana" ? "Mañana" : "Tarde"}
                 </div>
                 <div className="helper">
-                  Tu solicitud: {sol.diaSolicitado} (
-                  {sol.franja === "manana" ? "Mañana" : "Tarde"})
+                  Tu solicitud: {sol.diaSolicitado} ({sol.franja === "manana" ? "Mañana" : "Tarde"})
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                <button className="btn btn-primary" disabled={busyId === sol.id} onClick={() => aceptar(sol)}>
+                <button
+                  className="btn btn-primary"
+                  disabled={busyId === sol.id}
+                  onClick={() => aceptar(sol)}
+                >
                   {busyId === sol.id ? "Confirmando..." : "Aceptar"}
                 </button>
-                <button className="btn btn-outline" disabled={busyId === sol.id} onClick={() => rechazar(sol)}>
+                <button
+                  className="btn btn-outline"
+                  disabled={busyId === sol.id}
+                  onClick={() => rechazar(sol)}
+                >
                   {busyId === sol.id ? "Procesando..." : "Rechazar"}
                 </button>
               </div>

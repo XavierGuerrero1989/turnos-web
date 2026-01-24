@@ -11,6 +11,7 @@ import {
   doc,
   getDoc,
   setDoc,
+  updateDoc,
   serverTimestamp,
 } from "firebase/firestore";
 
@@ -30,11 +31,15 @@ export default function Onboarding() {
   // email tomado del query param ?email=
   const linkEmail = useMemo(() => {
     const raw = sp.get("email");
-    try { return raw ? decodeURIComponent(raw).toLowerCase() : ""; } catch { return raw || ""; }
+    try {
+      return raw ? decodeURIComponent(raw).toLowerCase() : "";
+    } catch {
+      return raw || "";
+    }
   }, [sp]);
 
   const [email, setEmail] = useState(linkEmail || "");
-  const [askPassword, setAskPassword] = useState(true);   // permitir crear password ahora
+  const [askPassword, setAskPassword] = useState(true); // permitir crear password ahora
   const [pass, setPass] = useState("");
   const [pass2, setPass2] = useState("");
   const [working, setWorking] = useState(false);
@@ -59,26 +64,77 @@ export default function Onboarding() {
       const ref = doc(db, "usuarios", u.uid);
       const snap = await getDoc(ref);
       if (!snap.exists()) {
-        await setDoc(ref, {
-          email: u.email || email,
-          role: "paciente",
-          nombre: "",
-          apellido: "",
-          dni: "",
-          hasPassword: false,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        }, { merge: true });
+        await setDoc(
+          ref,
+          {
+            email: u.email || email,
+            role: "paciente",
+            nombre: "",
+            apellido: "",
+            dni: "",
+            hasPassword: false,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
       }
     } catch (e) {
       console.warn("crearPerfilSiFalta:", e);
     }
   };
 
+  // ✅ NUEVO: aplicar datos de invitación (si vienen en ?invite=...)
+  const aplicarInvitacion = async (u) => {
+    const inviteId = sp.get("invite");
+    if (!inviteId) return;
+
+    try {
+      const invRef = doc(db, "invitaciones", inviteId);
+      const invSnap = await getDoc(invRef);
+      if (!invSnap.exists()) return;
+
+      const inv = invSnap.data();
+
+      // Seguridad básica: si el email de invitación existe, debe coincidir con el email del usuario
+      const invEmail = String(inv.email || "").toLowerCase().trim();
+      const userEmail = String(u.email || email || "").toLowerCase().trim();
+      if (invEmail && userEmail && invEmail !== userEmail) return;
+
+      // Merge: solo seteamos si hay dato real (evita pisar con strings vacíos)
+      const payload = {
+        email: u.email || email,
+        role: "paciente",
+        invitacionId: inviteId,
+        updatedAt: serverTimestamp(),
+      };
+
+      if (inv.nombre?.trim()) payload.nombre = inv.nombre.trim();
+      if (inv.apellido?.trim()) payload.apellido = inv.apellido.trim();
+      if (inv.dni?.trim()) payload.dni = inv.dni.trim();
+      if (inv.telefono?.trim()) payload.telefono = inv.telefono.trim();
+
+      await setDoc(doc(db, "usuarios", u.uid), payload, { merge: true });
+
+      // Marcar invitación como aceptada (opcional, pero recomendado)
+      await updateDoc(invRef, {
+        estado: "aceptada",
+        pacienteUid: u.uid,
+        acceptedAt: serverTimestamp(),
+      });
+    } catch (e) {
+      console.warn("aplicarInvitacion:", e);
+    }
+  };
+
   const setHasPasswordFlag = async (u, value) => {
     try {
       const ref = doc(db, "usuarios", u.uid);
-      await setDoc(ref, { hasPassword: !!value, updatedAt: serverTimestamp() }, { merge: true });
+      await setDoc(
+        ref,
+        { hasPassword: !!value, updatedAt: serverTimestamp() },
+        { merge: true }
+      );
     } catch (e) {
       console.warn("setHasPasswordFlag:", e);
     }
@@ -123,6 +179,9 @@ export default function Onboarding() {
       // 2) crear perfil si no existe
       await crearPerfilSiFalta(cred.user);
 
+      // ✅ 2.1) aplicar datos desde la invitación si existe ?invite=
+      await aplicarInvitacion(cred.user);
+
       // 3) si el usuario decidió crear password ahora, lo seteamos
       if (askPassword) {
         await updatePassword(cred.user, pass); // requiere login reciente: acá lo tenemos
@@ -136,7 +195,8 @@ export default function Onboarding() {
       if (e?.code === "auth/invalid-action-code") msg = "El enlace expiró o ya fue usado.";
       if (e?.code === "auth/invalid-email") msg = "El email ingresado no es válido.";
       if (e?.code === "auth/weak-password") msg = "La contraseña es muy débil.";
-      if (e?.code === "auth/requires-recent-login") msg = "Por seguridad, volvé a abrir el enlace para configurar tu contraseña.";
+      if (e?.code === "auth/requires-recent-login")
+        msg = "Por seguridad, volvé a abrir el enlace para configurar tu contraseña.";
       setErr(msg);
       setWorking(false);
     }
@@ -149,7 +209,10 @@ export default function Onboarding() {
       <Card className="form-narrow">
         <div className="stack-lg">
           <div style={{ textAlign: "center" }}>
-            <div className="brand" style={{ justifyContent: "center", marginBottom: 8 }}>
+            <div
+              className="brand"
+              style={{ justifyContent: "center", marginBottom: 8 }}
+            >
               <span className="brand-badge">Gt</span>
               <span>GineTurnos</span>
             </div>
@@ -174,7 +237,14 @@ export default function Onboarding() {
             />
 
             {/* Toggle para crear contraseña ahora */}
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 14,
+              }}
+            >
               <input
                 type="checkbox"
                 checked={askPassword}
@@ -215,15 +285,19 @@ export default function Onboarding() {
               <Button type="submit" disabled={!linkValido || working}>
                 {working ? "Confirmando..." : "Confirmar"}
               </Button>
-              <Link to="/login" className="btn btn-outline">Volver a Login</Link>
+              <Link to="/login" className="btn btn-outline">
+                Volver a Login
+              </Link>
             </div>
           </form>
 
           <p className="helper">
-            Abriste un enlace de acceso por correo. Si no lo solicitaste vos, ignorá el mensaje.
+            Abriste un enlace de acceso por correo. Si no lo solicitaste vos,
+            ignorá el mensaje.
           </p>
         </div>
       </Card>
     </div>
   );
 }
+

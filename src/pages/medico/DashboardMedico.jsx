@@ -41,12 +41,18 @@ export default function DashboardMedico() {
   const [proximosCount, setProximosCount] = useState(0);
   const [pacientesCount, setPacientesCount] = useState(0);
 
+  // 🧾 KPI Recetas
+  const [recetasPendientesCount, setRecetasPendientesCount] = useState(0);
+
   // Listas
   const [agendaHoy, setAgendaHoy] = useState([]);               // confirmadas hoy
   const [pendientesPropuesta, setPendientesPropuesta] = useState([]); // estado: "propuesta"
   const [solicitudesNuevas, setSolicitudesNuevas] = useState([]);     // estado: "pendiente"
   const [ultEvo, setUltEvo] = useState([]);                     // evoluciones recientes
   const [pacMap, setPacMap] = useState({});                     // id -> {nombre, apellido, email}
+
+  // 🧾 últimas recetas pendientes
+  const [recetasPendientes, setRecetasPendientes] = useState([]);
 
   // Confirmadas HOY
   useEffect(() => {
@@ -101,6 +107,29 @@ export default function DashboardMedico() {
     return () => unsub();
   }, []);
 
+  // 🧾 Recetas pendientes (conteo) — sin índices compuestos: filtramos en memoria
+  useEffect(() => {
+    const qRef = query(collection(db, "recetas"));
+    const unsub = onSnapshot(qRef, (snap) => {
+      const count = snap.docs
+        .map((d) => d.data())
+        .filter((r) => String(r.estado || "").toLowerCase() === "solicitada").length;
+      setRecetasPendientesCount(count);
+    });
+    return () => unsub();
+  }, []);
+
+  // 🧾 Últimas recetas solicitadas (top 5)
+  useEffect(() => {
+    const qRef = query(collection(db, "recetas"), orderBy("createdAt", "desc"), limit(10));
+    const unsub = onSnapshot(qRef, (snap) => {
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const pendientes = rows.filter((r) => String(r.estado || "").toLowerCase() === "solicitada");
+      setRecetasPendientes(pendientes.slice(0, 5));
+    });
+    return () => unsub();
+  }, []);
+
   // Solicitudes nuevas (pendiente) — ordenamos en memoria para evitar índice compuesto
   useEffect(() => {
     const qRef = query(collection(db, "solicitudes"), where("estado", "==", "pendiente"));
@@ -152,6 +181,7 @@ export default function DashboardMedico() {
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "flex-end" }}>
         <Link to="/medico/invitar" className="btn btn-primary">Invitar paciente</Link>
         <Link to="/medico/solicitudes" className="btn btn-outline">Ver solicitudes</Link>
+        <Link to="/medico/recetas" className="btn btn-outline">Recetas</Link>
         <Link to="/medico/disponibilidad" className="btn btn-outline">Disponibilidad</Link>
       </div>
 
@@ -177,6 +207,16 @@ export default function DashboardMedico() {
           <div style={{ fontSize: 28, fontWeight: 800 }}>{pacientesCount}</div>
           <div className="muted">Total en sistema</div>
         </div>
+
+        {/* 🧾 NUEVO KPI: Recetas pendientes */}
+        <div className="card">
+          <div className="muted">Recetas pendientes</div>
+          <div style={{ fontSize: 28, fontWeight: 800 }}>{recetasPendientesCount}</div>
+          <div className="muted">Solicitadas por pacientes</div>
+          <div style={{ marginTop: 10 }}>
+            <Link to="/medico/recetas" className="btn btn-outline">Ver recetas</Link>
+          </div>
+        </div>
       </div>
 
       {/* Filtros de rango */}
@@ -192,6 +232,34 @@ export default function DashboardMedico() {
         <div style={{ alignSelf: "center" }}>
           <Link to="/medico/turnos" className="btn btn-outline">Ver agenda completa</Link>
         </div>
+      </div>
+
+      {/* 🧾 Recetas pendientes (últimas) */}
+      <div className="card">
+        <h3 style={{ marginTop: 0, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          Recetas pendientes
+          <Link to="/medico/recetas" className="btn btn-outline">Abrir</Link>
+        </h3>
+        {recetasPendientes.length === 0 ? (
+          <div className="muted">No hay recetas solicitadas pendientes.</div>
+        ) : (
+          <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 }}>
+            {recetasPendientes.map((r) => (
+              <li key={r.id} className="item" style={{ display: "grid", gap: 6 }}>
+                <div>
+                  <strong>{r.pacienteNombre || r.pacienteEmail || r.pacienteId || "Paciente"}</strong>{" "}
+                  <span className="muted">· {r.obraSocial || "-"}</span>
+                </div>
+                {String(r.obraSocial || "").toUpperCase() === "IOMA" && r.dni ? (
+                  <div className="muted">DNI: {r.dni}</div>
+                ) : null}
+                {r.medicacionSolicitada ? (
+                  <div className="muted">Medicacion: {r.medicacionSolicitada}</div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* Agenda de hoy + Últimas evoluciones */}

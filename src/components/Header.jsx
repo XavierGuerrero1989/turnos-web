@@ -18,6 +18,7 @@ export default function Header() {
   const PacLinks = () => (
     <>
       <Link to="/paciente/solicitar-turno">Solicitar turno</Link>
+      <Link to="/paciente#receta">Solicitar receta</Link>
       <Link to="/paciente/mis-turnos">Mis turnos</Link>
       <Link to="/paciente/perfil">Mi perfil</Link>
     </>
@@ -29,6 +30,8 @@ export default function Header() {
       <Link to="/medico/turnos">Turnos</Link>
       <Link to="/medico/pacientes">Pacientes</Link>
       <Link to="/medico/disponibilidad">Disponibilidad</Link>
+      <Link to="/medico/recetas">Recetas</Link>
+
       <Link to="/medico/invitar">Invitar</Link>
     </>
   );

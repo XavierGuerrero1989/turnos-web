@@ -402,7 +402,7 @@ export default function HomePaciente() {
         <ul style={{ paddingLeft: "20px", margin: 0 }}>
           <li>Recordá estar lista 5 minutos antes de tu cita.</li>
           <li>
-            La doctora te enviará el link de la videollamada por mail a la casilla que nos informaste.
+            El link de la videollamada lo veras en la sección "Mis Turnos" dentro de tu turno confirmado.
           </li>
           <li>
             Si no enviás el comprobante de pago al mail de la doctora, el turno se considera cancelado.

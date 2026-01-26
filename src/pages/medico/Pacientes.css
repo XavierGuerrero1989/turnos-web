@@ -1,0 +1,72 @@
+.pacLayout {
+  display: grid;
+  gap: 12px;
+}
+
+/* Buscador */
+.pacSearch {
+  max-width: 520px;
+}
+
+@media (max-width: 640px) {
+  .pacSearch {
+    max-width: 100%;
+  }
+
+  .pacSearch .input {
+    width: 100%;
+  }
+}
+
+/* Lista */
+.pacList {
+  display: grid;
+  gap: 12px;
+}
+
+/* Card */
+.pacCard {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 800px) {
+  .pacCard {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Info */
+.pacInfo {
+  display: grid;
+  gap: 6px;
+}
+
+.pacName {
+  font-weight: 700;
+}
+
+.pacMeta {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* Acciones */
+.pacActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+
+@media (max-width: 800px) {
+  .pacActions {
+    margin-top: 8px;
+  }
+
+  .pacActions .btn {
+    width: 100%;
+  }
+}

@@ -6,6 +6,8 @@ import { db } from "../../firebase.js";
 import { collection, onSnapshot } from "firebase/firestore";
 import Swal from "sweetalert2";
 
+import "./Pacientes.css";
+
 export default function Pacientes() {
   const { role, loading } = useAuth();
   const nav = useNavigate();
@@ -18,7 +20,7 @@ export default function Pacientes() {
   const [loadingList, setLoadingList] = useState(true);
   const [qText, setQText] = useState("");
 
-  // Suscripción a la colección de usuarios (pacientes)
+  // Suscripción pacientes
   useEffect(() => {
     if (role !== "medico") return;
     setLoadingList(true);
@@ -28,7 +30,6 @@ export default function Pacientes() {
       ref,
       (snap) => {
         const arr = snap.docs.map((d) => ({ id: d.id, uid: d.id, ...d.data() }));
-        // Orden básico por nombre/apellido
         arr.sort((a, b) => {
           const an = `${(a.nombre || "").toLowerCase()} ${(a.apellido || "").toLowerCase()}`.trim();
           const bn = `${(b.nombre || "").toLowerCase()} ${(b.apellido || "").toLowerCase()}`.trim();
@@ -38,7 +39,7 @@ export default function Pacientes() {
         setLoadingList(false);
       },
       (err) => {
-        console.error("onSnapshot(usuarios) error:", err);
+        console.error(err);
         setPacientes([]);
         setLoadingList(false);
       }
@@ -46,25 +47,23 @@ export default function Pacientes() {
     return () => unsub();
   }, [role]);
 
-  // Búsqueda GLOBAL (nombre, apellido, DNI, email, teléfono)
+  // Búsqueda global
   const filtered = useMemo(() => {
     const t = qText.trim().toLowerCase();
     if (!t) return pacientes;
-    return pacientes.filter((p) => {
-      return (
-        `${p.nombre || ""} ${p.apellido || ""}`.toLowerCase().includes(t) ||
-        (p.dni || "").toString().toLowerCase().includes(t) ||
-        (p.email || "").toLowerCase().includes(t) ||
-        (p.telefono || "").toLowerCase().includes(t)
-      );
-    });
+    return pacientes.filter((p) =>
+      `${p.nombre || ""} ${p.apellido || ""}`.toLowerCase().includes(t) ||
+      (p.dni || "").toString().includes(t) ||
+      (p.email || "").toLowerCase().includes(t) ||
+      (p.telefono || "").toLowerCase().includes(t)
+    );
   }, [pacientes, qText]);
 
-  const copiar = async (texto, label = "Copiado") => {
+  const copiar = async (texto, label) => {
     try {
       await navigator.clipboard.writeText(texto);
       Swal.fire(label, texto, "success");
-    } catch (e) {
+    } catch {
       Swal.fire("No se pudo copiar", texto, "warning");
     }
   };
@@ -76,17 +75,16 @@ export default function Pacientes() {
   if (role !== "medico") return null;
 
   return (
-    <div className="container" style={{ display: "grid", gap: 12 }}>
-      <h2 style={{ marginBottom: 0 }}>Pacientes</h2>
+    <div className="container pacLayout">
+      <h2>Pacientes</h2>
 
-      {/* Barra de búsqueda */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      {/* Buscador */}
+      <div className="pacSearch">
         <input
           className="input"
           placeholder="Buscar por nombre, apellido, DNI, email o teléfono…"
           value={qText}
           onChange={(e) => setQText(e.target.value)}
-          style={{ minWidth: 320 }}
         />
       </div>
 
@@ -94,40 +92,40 @@ export default function Pacientes() {
       {loadingList ? (
         <div className="card">Cargando…</div>
       ) : filtered.length === 0 ? (
-        <div className="card">No se encontraron pacientes con ese criterio.</div>
+        <div className="card">No se encontraron pacientes.</div>
       ) : (
-        <div style={{ display: "grid", gap: 12 }}>
+        <div className="pacList">
           {filtered.map((p) => {
-            const nombre = `${p.nombre || ""} ${p.apellido || ""}`.trim() || "Paciente";
+            const nombre =
+              `${p.nombre || ""} ${p.apellido || ""}`.trim() || "Paciente";
+
             return (
-              <div
-                key={p.uid}
-                className="card"
-                style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12 }}
-              >
-                <div>
-                  <div style={{ fontWeight: 700, marginBottom: 4 }}>{nombre}</div>
-                  <div className="helper">
-                    DNI: <b>{p.dni || "-"}</b> · Email: <b>{p.email || "-"}</b> · Tel: <b>{p.telefono || "-"}</b>
+              <div key={p.uid} className="card pacCard">
+                <div className="pacInfo">
+                  <div className="pacName">{nombre}</div>
+                  <div className="pacMeta">
+                    DNI: <b>{p.dni || "-"}</b> · Email: <b>{p.email || "-"}</b> · Tel:{" "}
+                    <b>{p.telefono || "-"}</b>
                   </div>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+
+                <div className="pacActions">
                   <button className="btn btn-primary" onClick={() => verFicha(p)}>
                     Ver ficha
                   </button>
+
                   <button
                     className="btn btn-outline"
                     onClick={() => copiar(p.email || "", "Email copiado")}
                     disabled={!p.email}
-                    title={p.email ? "Copiar email" : "Sin email"}
                   >
                     Copiar email
                   </button>
+
                   <button
                     className="btn btn-outline"
                     onClick={() => copiar(p.telefono || "", "Teléfono copiado")}
                     disabled={!p.telefono}
-                    title={p.telefono ? "Copiar teléfono" : "Sin teléfono"}
                   >
                     Copiar teléfono
                   </button>

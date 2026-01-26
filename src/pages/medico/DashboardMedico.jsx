@@ -4,9 +4,17 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/AuthProvider.jsx";
 import { db } from "../../firebase.js";
 import {
-  collection, query, where, orderBy, limit, onSnapshot,
-  getDocs, documentId
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  onSnapshot,
+  getDocs,
+  documentId,
 } from "firebase/firestore";
+
+import "./DashboardMedico.css";
 
 // Helpers fecha/hora
 const toISO = (d) => d.toISOString().slice(0, 10);
@@ -27,12 +35,16 @@ export default function DashboardMedico() {
     if (!loading && role !== "medico") nav("/", { replace: true });
   }, [role, loading, nav]);
 
-  // Filtros para próximos turnos
+  // Filtros rango
   const [desde, setDesde] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - 30); return toISO(d);
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return toISO(d);
   });
   const [hasta, setHasta] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() + 60); return toISO(d);
+    const d = new Date();
+    d.setDate(d.getDate() + 60);
+    return toISO(d);
   });
 
   // KPIs
@@ -40,18 +52,14 @@ export default function DashboardMedico() {
   const [propuestasCount, setPropuestasCount] = useState(0);
   const [proximosCount, setProximosCount] = useState(0);
   const [pacientesCount, setPacientesCount] = useState(0);
-
-  // 🧾 KPI Recetas
   const [recetasPendientesCount, setRecetasPendientesCount] = useState(0);
 
   // Listas
-  const [agendaHoy, setAgendaHoy] = useState([]);               // confirmadas hoy
-  const [pendientesPropuesta, setPendientesPropuesta] = useState([]); // estado: "propuesta"
-  const [solicitudesNuevas, setSolicitudesNuevas] = useState([]);     // estado: "pendiente"
-  const [ultEvo, setUltEvo] = useState([]);                     // evoluciones recientes
-  const [pacMap, setPacMap] = useState({});                     // id -> {nombre, apellido, email}
-
-  // 🧾 últimas recetas pendientes
+  const [agendaHoy, setAgendaHoy] = useState([]);
+  const [pendientesPropuesta, setPendientesPropuesta] = useState([]);
+  const [solicitudesNuevas, setSolicitudesNuevas] = useState([]);
+  const [ultEvo, setUltEvo] = useState([]);
+  const [pacMap, setPacMap] = useState({});
   const [recetasPendientes, setRecetasPendientes] = useState([]);
 
   // Confirmadas HOY
@@ -62,8 +70,11 @@ export default function DashboardMedico() {
       where("propuesta.dia", "==", hoyISO())
     );
     const unsub = onSnapshot(qRef, (snap) => {
-      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => (a.propuesta?.hora || "").localeCompare(b.propuesta?.hora || ""));
+      const rows = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) =>
+          (a.propuesta?.hora || "").localeCompare(b.propuesta?.hora || "")
+        );
       setAgendaHoy(rows);
       setTurnosHoy(rows.length);
     });
@@ -72,22 +83,29 @@ export default function DashboardMedico() {
 
   // Propuestas pendientes
   useEffect(() => {
-    const qRef = query(collection(db, "solicitudes"), where("estado", "==", "propuesta"));
+    const qRef = query(
+      collection(db, "solicitudes"),
+      where("estado", "==", "propuesta")
+    );
     const unsub = onSnapshot(qRef, (snap) => {
-      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
-        .sort((a, b) =>
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      rows.sort(
+        (a, b) =>
           (a.propuesta?.dia || "").localeCompare(b.propuesta?.dia || "") ||
           (a.propuesta?.hora || "").localeCompare(b.propuesta?.hora || "")
-        );
+      );
       setPendientesPropuesta(rows);
       setPropuestasCount(rows.length);
     });
     return () => unsub();
   }, []);
 
-  // Próximos turnos (confirmadas en rango) — filtra en memoria para evitar índice compuesto
+  // Próximos turnos (confirmadas en rango)
   useEffect(() => {
-    const qRef = query(collection(db, "solicitudes"), where("estado", "==", "confirmada"));
+    const qRef = query(
+      collection(db, "solicitudes"),
+      where("estado", "==", "confirmada")
+    );
     const unsub = onSnapshot(qRef, (snap) => {
       const count = snap.docs
         .map((d) => d.data())
@@ -100,67 +118,103 @@ export default function DashboardMedico() {
     return () => unsub();
   }, [desde, hasta]);
 
-  // Pacientes (conteo simple)
+  // Pacientes
   useEffect(() => {
-    const qRef = query(collection(db, "usuarios"), where("role", "==", "paciente"));
-    const unsub = onSnapshot(qRef, (snap) => setPacientesCount(snap.size));
+    const qRef = query(
+      collection(db, "usuarios"),
+      where("role", "==", "paciente")
+    );
+    const unsub = onSnapshot(qRef, (snap) =>
+      setPacientesCount(snap.size)
+    );
     return () => unsub();
   }, []);
 
-  // 🧾 Recetas pendientes (conteo) — sin índices compuestos: filtramos en memoria
+  // Recetas pendientes (conteo)
   useEffect(() => {
     const qRef = query(collection(db, "recetas"));
     const unsub = onSnapshot(qRef, (snap) => {
       const count = snap.docs
         .map((d) => d.data())
-        .filter((r) => String(r.estado || "").toLowerCase() === "solicitada").length;
+        .filter(
+          (r) => String(r.estado || "").toLowerCase() === "solicitada"
+        ).length;
       setRecetasPendientesCount(count);
     });
     return () => unsub();
   }, []);
 
-  // 🧾 Últimas recetas solicitadas (top 5)
+  // Últimas recetas solicitadas
   useEffect(() => {
-    const qRef = query(collection(db, "recetas"), orderBy("createdAt", "desc"), limit(10));
+    const qRef = query(
+      collection(db, "recetas"),
+      orderBy("createdAt", "desc"),
+      limit(10)
+    );
     const unsub = onSnapshot(qRef, (snap) => {
       const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      const pendientes = rows.filter((r) => String(r.estado || "").toLowerCase() === "solicitada");
+      const pendientes = rows.filter(
+        (r) => String(r.estado || "").toLowerCase() === "solicitada"
+      );
       setRecetasPendientes(pendientes.slice(0, 5));
     });
     return () => unsub();
   }, []);
 
-  // Solicitudes nuevas (pendiente) — ordenamos en memoria para evitar índice compuesto
+  // Solicitudes nuevas
   useEffect(() => {
-    const qRef = query(collection(db, "solicitudes"), where("estado", "==", "pendiente"));
+    const qRef = query(
+      collection(db, "solicitudes"),
+      where("estado", "==", "pendiente")
+    );
     const unsub = onSnapshot(qRef, (snap) => {
       const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      rows.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+      rows.sort(
+        (a, b) =>
+          (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)
+      );
       setSolicitudesNuevas(rows.slice(0, 5));
     });
     return () => unsub();
   }, []);
 
-  // Últimas evoluciones + mapa de pacientes
+  // Últimas evoluciones + pacientes
   useEffect(() => {
-    const qRef = query(collection(db, "evoluciones"), orderBy("createdAt", "desc"), limit(5));
+    const qRef = query(
+      collection(db, "evoluciones"),
+      orderBy("createdAt", "desc"),
+      limit(5)
+    );
     const unsub = onSnapshot(qRef, async (snap) => {
       const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setUltEvo(rows);
 
-      const ids = [...new Set(rows.map((r) => r.pacienteId).filter(Boolean))];
-      if (!ids.length) { setPacMap({}); return; }
+      const ids = [
+        ...new Set(rows.map((r) => r.pacienteId).filter(Boolean)),
+      ];
+      if (!ids.length) {
+        setPacMap({});
+        return;
+      }
 
       const chunks = [];
-      for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10));
+      for (let i = 0; i < ids.length; i += 10)
+        chunks.push(ids.slice(i, i + 10));
 
       const map = {};
-      await Promise.all(chunks.map(async (chunk) => {
-        const s = await getDocs(
-          query(collection(db, "usuarios"), where(documentId(), "in", chunk))
-        );
-        s.forEach((u) => { map[u.id] = u.data(); });
-      }));
+      await Promise.all(
+        chunks.map(async (chunk) => {
+          const s = await getDocs(
+            query(
+              collection(db, "usuarios"),
+              where(documentId(), "in", chunk)
+            )
+          );
+          s.forEach((u) => {
+            map[u.id] = u.data();
+          });
+        })
+      );
       setPacMap(map);
     });
     return () => unsub();
@@ -168,112 +222,139 @@ export default function DashboardMedico() {
 
   const nombreDe = (id) => {
     const u = pacMap[id];
-    if (!u) return id; // while loading
-    const full = [u.nombre, u.apellido].filter(Boolean).join(" ").trim();
-    return full || u.email || id;
+    if (!u) return id;
+    return (
+      [u.nombre, u.apellido].filter(Boolean).join(" ").trim() ||
+      u.email ||
+      id
+    );
   };
 
   if (role !== "medico") return null;
 
   return (
-    <div className="container" style={{ display: "grid", gap: 16 }}>
+    <div className="container dmLayout">
       {/* Acciones */}
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "flex-end" }}>
-        <Link to="/medico/invitar" className="btn btn-primary">Invitar paciente</Link>
-        <Link to="/medico/solicitudes" className="btn btn-outline">Ver solicitudes</Link>
-        <Link to="/medico/recetas" className="btn btn-outline">Recetas</Link>
-        <Link to="/medico/disponibilidad" className="btn btn-outline">Disponibilidad</Link>
+      <div className="dmActions">
+        <Link to="/medico/invitar" className="btn btn-primary">
+          Invitar paciente
+        </Link>
+        <Link to="/medico/solicitudes" className="btn btn-outline">
+          Ver solicitudes
+        </Link>
+        <Link to="/medico/recetas" className="btn btn-outline">
+          Recetas
+        </Link>
+        <Link to="/medico/disponibilidad" className="btn btn-outline">
+          Disponibilidad
+        </Link>
       </div>
 
-      {/* KPI cards (responsive con .kpi-grid) */}
+      {/* KPIs */}
       <div className="kpi-grid">
         <div className="card">
           <div className="muted">Turnos HOY</div>
-          <div style={{ fontSize: 28, fontWeight: 800 }}>{turnosHoy}</div>
-          <div className="muted">Confirmados para hoy</div>
+          <div className="kpiValue">{turnosHoy}</div>
+          <div className="muted">Confirmados</div>
         </div>
+
         <div className="card">
-          <div className="muted">Pendientes de confirmar</div>
-          <div style={{ fontSize: 28, fontWeight: 800 }}>{propuestasCount}</div>
-          <div className="muted">Propuestas enviadas</div>
+          <div className="muted">Propuestas</div>
+          <div className="kpiValue">{propuestasCount}</div>
+          <div className="muted">Pendientes</div>
         </div>
+
         <div className="card">
           <div className="muted">Próximos turnos</div>
-          <div style={{ fontSize: 28, fontWeight: 800 }}>{proximosCount}</div>
-          <div className="muted">En el rango seleccionado</div>
+          <div className="kpiValue">{proximosCount}</div>
+          <div className="muted">En rango</div>
         </div>
+
         <div className="card">
           <div className="muted">Pacientes</div>
-          <div style={{ fontSize: 28, fontWeight: 800 }}>{pacientesCount}</div>
-          <div className="muted">Total en sistema</div>
+          <div className="kpiValue">{pacientesCount}</div>
+          <div className="muted">Totales</div>
         </div>
 
-        {/* 🧾 NUEVO KPI: Recetas pendientes */}
         <div className="card">
           <div className="muted">Recetas pendientes</div>
-          <div style={{ fontSize: 28, fontWeight: 800 }}>{recetasPendientesCount}</div>
-          <div className="muted">Solicitadas por pacientes</div>
-          <div style={{ marginTop: 10 }}>
-            <Link to="/medico/recetas" className="btn btn-outline">Ver recetas</Link>
-          </div>
+          <div className="kpiValue">{recetasPendientesCount}</div>
+          <div className="muted">Solicitadas</div>
+          <Link to="/medico/recetas" className="btn btn-outline mt8">
+            Ver recetas
+          </Link>
         </div>
       </div>
 
-      {/* Filtros de rango */}
-      <div className="card" style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 12, alignItems: "end" }}>
+      {/* Filtros */}
+      <div className="card dmDateFilters">
         <div>
-          <label className="muted" htmlFor="desde">Desde</label>
-          <input id="desde" type="date" className="input" value={desde} onChange={(e) => setDesde(e.target.value)} />
+          <label className="muted">Desde</label>
+          <input
+            type="date"
+            className="input"
+            value={desde}
+            onChange={(e) => setDesde(e.target.value)}
+          />
         </div>
         <div>
-          <label className="muted" htmlFor="hasta">Hasta</label>
-          <input id="hasta" type="date" className="input" value={hasta} onChange={(e) => setHasta(e.target.value)} />
+          <label className="muted">Hasta</label>
+          <input
+            type="date"
+            className="input"
+            value={hasta}
+            onChange={(e) => setHasta(e.target.value)}
+          />
         </div>
-        <div style={{ alignSelf: "center" }}>
-          <Link to="/medico/turnos" className="btn btn-outline">Ver agenda completa</Link>
-        </div>
+        <Link to="/medico/turnos" className="btn btn-outline">
+          Ver agenda
+        </Link>
       </div>
 
-      {/* 🧾 Recetas pendientes (últimas) */}
+      {/* Recetas pendientes */}
       <div className="card">
-        <h3 style={{ marginTop: 0, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h3 className="dmCardTitle">
           Recetas pendientes
-          <Link to="/medico/recetas" className="btn btn-outline">Abrir</Link>
+          <Link to="/medico/recetas" className="btn btn-outline">
+            Abrir
+          </Link>
         </h3>
         {recetasPendientes.length === 0 ? (
-          <div className="muted">No hay recetas solicitadas pendientes.</div>
+          <div className="muted">No hay recetas pendientes.</div>
         ) : (
-          <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 }}>
+          <ul className="dmList">
             {recetasPendientes.map((r) => (
-              <li key={r.id} className="item" style={{ display: "grid", gap: 6 }}>
-                <div>
-                  <strong>{r.pacienteNombre || r.pacienteEmail || r.pacienteId || "Paciente"}</strong>{" "}
-                  <span className="muted">· {r.obraSocial || "-"}</span>
+              <li key={r.id} className="item">
+                <strong>
+                  {r.pacienteNombre ||
+                    r.pacienteEmail ||
+                    r.pacienteId ||
+                    "Paciente"}
+                </strong>
+                <div className="muted">
+                  {r.medicacionSolicitada || "-"}
                 </div>
-                {String(r.obraSocial || "").toUpperCase() === "IOMA" && r.dni ? (
-                  <div className="muted">DNI: {r.dni}</div>
-                ) : null}
-                {r.medicacionSolicitada ? (
-                  <div className="muted">Medicacion: {r.medicacionSolicitada}</div>
-                ) : null}
               </li>
             ))}
           </ul>
         )}
       </div>
 
-      {/* Agenda de hoy + Últimas evoluciones */}
-      <div className="two-col">
+      {/* Agenda + Evoluciones */}
+      <div className="dmTwoCol">
         <div className="card">
-          <h3 style={{ marginTop: 0 }}>Agenda de hoy</h3>
+          <h3>Agenda de hoy</h3>
           {agendaHoy.length === 0 ? (
-            <div className="muted">No hay turnos confirmados para hoy.</div>
+            <div className="muted">No hay turnos hoy.</div>
           ) : (
-            <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 8 }}>
+            <ul className="dmList">
               {agendaHoy.map((t) => (
                 <li key={t.id} className="item">
-                  <strong>{fmtHora(t.propuesta?.hora)}</strong>{" "}
-                  — {t.pacienteNombre || t.pacienteEmail || t.pacienteId || "Paciente"}
+                  <strong>{fmtHora(t.propuesta?.hora)}</strong> —{" "}
+                  {t.pacienteNombre ||
+                    t.pacienteEmail ||
+                    t.pacienteId ||
+                    "Paciente"}
                 </li>
               ))}
             </ul>
@@ -281,21 +362,22 @@ export default function DashboardMedico() {
         </div>
 
         <div className="card">
-          <h3 style={{ marginTop: 0 }}>Últimas evoluciones</h3>
+          <h3>Últimas evoluciones</h3>
           {ultEvo.length === 0 ? (
-            <div className="muted">Sin evoluciones recientes.</div>
+            <div className="muted">Sin evoluciones.</div>
           ) : (
-            <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 }}>
-              {ultEvo.map((evo) => (
-                <li key={evo.id} className="item">
+            <ul className="dmList">
+              {ultEvo.map((e) => (
+                <li key={e.id} className="item">
                   <div className="muted">
-                    {evo.createdAt?.toDate ? evo.createdAt.toDate().toLocaleString() : ""}
+                    {e.createdAt?.toDate
+                      ? e.createdAt.toDate().toLocaleString()
+                      : ""}
                   </div>
                   <div>
-                    <span className="muted">Paciente:</span>{" "}
-                    {evo.pacienteNombre || nombreDe(evo.pacienteId)}
+                    <strong>{nombreDe(e.pacienteId)}</strong>
                   </div>
-                  {evo.texto && <div>{evo.texto}</div>}
+                  {e.texto && <div>{e.texto}</div>}
                 </li>
               ))}
             </ul>
@@ -303,26 +385,32 @@ export default function DashboardMedico() {
         </div>
       </div>
 
-      {/* Propuestas pendientes (sin Confirmar/Rechazar) */}
+      {/* Propuestas pendientes */}
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>Propuestas pendientes</h3>
+        <h3>Propuestas pendientes</h3>
         {pendientesPropuesta.length === 0 ? (
-          <div className="muted">No hay propuestas pendientes.</div>
+          <div className="muted">No hay propuestas.</div>
         ) : (
-          <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 }}>
+          <ul className="dmList">
             {pendientesPropuesta.map((s) => (
-              <li key={s.id} className="item" style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center" }}>
+              <li key={s.id} className="item dmRow">
                 <div>
                   <strong>{fmtFechaES(s.propuesta?.dia)}</strong>{" "}
-                  · <strong>{fmtHora(s.propuesta?.hora)}</strong>{" "}
-                  · {s.franja === "manana" ? "Mañana" : "Tarde"} —{" "}
-                  <span className="muted">
-                    ({s.pacienteNombre || s.pacienteEmail || s.pacienteId || "Paciente"})
-                  </span>
+                  · {fmtHora(s.propuesta?.hora)} ·{" "}
+                  {s.franja === "manana" ? "Mañana" : "Tarde"}
+                  <div className="muted">
+                    {s.pacienteNombre ||
+                      s.pacienteEmail ||
+                      s.pacienteId ||
+                      "Paciente"}
+                  </div>
                 </div>
-                <div className="btn-row">
-                  <Link to="/medico/solicitudes" className="btn btn-outline">Ver solicitud</Link>
-                </div>
+                <Link
+                  to="/medico/solicitudes"
+                  className="btn btn-outline"
+                >
+                  Ver
+                </Link>
               </li>
             ))}
           </ul>
@@ -331,18 +419,21 @@ export default function DashboardMedico() {
 
       {/* Solicitudes nuevas */}
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>Solicitudes nuevas</h3>
+        <h3>Solicitudes nuevas</h3>
         {solicitudesNuevas.length === 0 ? (
-          <div className="muted">No hay solicitudes pendientes.</div>
+          <div className="muted">No hay solicitudes.</div>
         ) : (
-          <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 }}>
+          <ul className="dmList">
             {solicitudesNuevas.map((s) => (
               <li key={s.id} className="item">
                 <strong>{fmtFechaES(s.diaSolicitado)}</strong> ·{" "}
-                {s.franja === "manana" ? "Mañana" : "Tarde"} —{" "}
-                <span className="muted">
-                  {s.pacienteNombre || s.pacienteEmail || s.pacienteId || "Paciente"}
-                </span>
+                {s.franja === "manana" ? "Mañana" : "Tarde"}
+                <div className="muted">
+                  {s.pacienteNombre ||
+                    s.pacienteEmail ||
+                    s.pacienteId ||
+                    "Paciente"}
+                </div>
               </li>
             ))}
           </ul>
@@ -351,43 +442,53 @@ export default function DashboardMedico() {
 
       {/* Pacientes recientes */}
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>Pacientes recientes</h3>
+        <h3>Pacientes recientes</h3>
         <PacientesRecientes />
       </div>
     </div>
   );
 }
 
-// Subcomponente: Pacientes recientes (sin índice compuesto)
 function PacientesRecientes() {
   const nav = useNavigate();
   const [rows, setRows] = useState([]);
 
   useEffect(() => {
-    const qRef = query(collection(db, "usuarios"), where("role", "==", "paciente"));
+    const qRef = query(
+      collection(db, "usuarios"),
+      where("role", "==", "paciente")
+    );
     const unsub = onSnapshot(qRef, (snap) => {
       const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      // Ordenamos en cliente por updatedAt desc y tomamos 5
-      list.sort((a, b) => (b.updatedAt?.seconds ?? 0) - (a.updatedAt?.seconds ?? 0));
+      list.sort(
+        (a, b) =>
+          (b.updatedAt?.seconds ?? 0) -
+          (a.updatedAt?.seconds ?? 0)
+      );
       setRows(list.slice(0, 5));
     });
     return () => unsub();
   }, []);
 
-  if (rows.length === 0) return <div className="muted">Sin pacientes aún.</div>;
+  if (rows.length === 0)
+    return <div className="muted">Sin pacientes.</div>;
 
   return (
-    <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 8 }}>
+    <ul className="dmList">
       {rows.map((p) => {
-        const nombre = [p.nombre, p.apellido].filter(Boolean).join(" ").trim() || "- -";
-        const email = p.email || "";
+        const nombre =
+          [p.nombre, p.apellido].filter(Boolean).join(" ").trim() ||
+          "- -";
         return (
-          <li key={p.id} className="item" style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 8 }}>
+          <li key={p.id} className="item dmRow">
             <div>
               <div>{nombre}</div>
-              <div className="muted">{email}</div>
+              <div className="muted">{p.email}</div>
             </div>
-            <button className="btn btn-outline" onClick={() => nav(`/medico/paciente/${p.id}`)}>
+            <button
+              className="btn btn-outline"
+              onClick={() => nav(`/medico/paciente/${p.id}`)}
+            >
               Abrir
             </button>
           </li>

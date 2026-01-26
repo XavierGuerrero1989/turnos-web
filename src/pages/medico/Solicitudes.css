@@ -1,0 +1,86 @@
+.solLayout {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Filtros */
+.solFilters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .solFilters {
+    flex-direction: column;
+  }
+
+  .solFilters .btn {
+    width: 100%;
+  }
+}
+
+/* Lista */
+.solList {
+  display: grid;
+  gap: 12px;
+}
+
+/* Card */
+.solCard {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 800px) {
+  .solCard {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Info */
+.solInfo {
+  display: grid;
+  gap: 4px;
+}
+
+.solPaciente {
+  font-weight: 700;
+}
+
+/* Meta */
+.solMeta {
+  font-size: 14px;
+}
+
+/* Estado */
+.solEstado {
+  font-size: 14px;
+}
+
+/* Acciones */
+.solActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+
+@media (max-width: 800px) {
+  .solActions {
+    margin-top: 8px;
+  }
+
+  .solActions .btn {
+    width: 100%;
+  }
+}
+
+/* Muted */
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}

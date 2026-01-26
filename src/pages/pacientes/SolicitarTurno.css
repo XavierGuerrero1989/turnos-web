@@ -1,0 +1,176 @@
+/* ===== Layout Responsive (desktop 2 col / mobile 1 col) ===== */
+.solicitarTurnoLayout {
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 980px) {
+  .solicitarTurnoLayout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===== Cards (reemplaza tu style inline grande) ===== */
+.stCard {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 16px;
+  height: fit-content;
+}
+
+@media (max-width: 520px) {
+  .stCard {
+    padding: 12px;
+    border-radius: 14px;
+  }
+}
+
+/* ===== Header calendario ===== */
+.stCalendarHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.stMonthTitle {
+  margin: 0;
+  text-transform: capitalize;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.stHelper {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+@media (max-width: 980px) {
+  .stHelper {
+    margin-left: 0;
+    width: 100%;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 520px) {
+  .stCalendarHeader {
+    gap: 8px;
+  }
+  .stMonthTitle {
+    font-size: 16px;
+  }
+}
+
+/* ===== Weekdays ===== */
+.stWeekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.stWeekdayCell {
+  text-align: center;
+  font-size: 13px;
+}
+
+@media (max-width: 520px) {
+  .stWeekdayCell {
+    font-size: 12px;
+  }
+}
+
+/* ===== Calendar grid ===== */
+.stCalendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+
+/* ===== Day button base ===== */
+.stDay {
+  padding: 10px 0;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  font-weight: 600;
+  min-height: 40px;
+  cursor: pointer;
+  transition: transform 0.06s ease, filter 0.12s ease, border-color 0.12s ease;
+}
+
+.stDay:active {
+  transform: scale(0.98);
+}
+
+/* ✅ Disponible (verde clarito) */
+.stDay--available {
+  background: #dcfce7; /* verde suave */
+  border-color: #86efac;
+}
+
+.stDay--available:hover {
+  filter: brightness(0.98);
+}
+
+/* ❌ No disponible (rojo clarito) */
+.stDay--unavailable {
+  background: #fee2e2; /* rojo suave */
+  border-color: #fca5a5;
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+/* Otro mes: apagado */
+.stDay--otherMonth {
+  color: #94a3b8;
+}
+
+/* Hoy */
+.stDay--today {
+  font-weight: 800;
+}
+
+/* Seleccionado: prioridad visual */
+.stDay--selected {
+  border-color: var(--primary);
+  background: var(--primary-bg);
+  box-shadow: 0 0 0 2px rgba(179, 37, 235, 0.15);
+}
+
+/* Mobile fino */
+@media (max-width: 520px) {
+  .stDay {
+    min-height: 36px;
+    border-radius: 10px;
+    padding: 8px 0;
+  }
+}
+
+/* ===== Panel ===== */
+.stPanelTitle {
+  margin-top: 0;
+}
+
+/* ===== Botones franja: apilar en mobile ===== */
+.stFranjaRow {
+  display: flex;
+  gap: 10px;
+}
+
+@media (max-width: 520px) {
+  .stFranjaRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .stFranjaRow .btn {
+    width: 100%;
+  }
+}

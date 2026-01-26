@@ -1,0 +1,135 @@
+.dmLayout {
+  display: grid;
+  gap: 16px;
+}
+
+/* Acciones */
+.dmActions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .dmActions {
+    flex-direction: column;
+  }
+  .dmActions .btn {
+    width: 100%;
+  }
+}
+
+/* KPIs */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 1200px) {
+  .kpi-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 700px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.kpiValue {
+  font-size: 28px;
+  font-weight: 800;
+}
+
+/* Filtros */
+.dmDateFilters {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+@media (max-width: 700px) {
+  .dmDateFilters {
+    grid-template-columns: 1fr;
+  }
+  .dmDateFilters .btn {
+    width: 100%;
+  }
+}
+
+/* Dos columnas */
+.dmTwoCol {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .dmTwoCol {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Listas */
+.dmList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+/* Items */
+.item {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+/* Filas con acción */
+.dmRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .dmRow {
+    grid-template-columns: 1fr;
+  }
+  .dmRow .btn {
+    width: 100%;
+  }
+}
+
+/* Textos */
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.mt8 {
+  margin-top: 8px;
+}
+
+/* Card (por si no está global) */
+.card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+
+@media (max-width: 520px) {
+  .card {
+    padding: 12px;
+    border-radius: 14px;
+  }
+}

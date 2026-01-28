@@ -87,6 +87,9 @@ export default function RecetasMedico() {
     const isIoma = obra === "IOMA";
     const estado = String(r.estado || "").toLowerCase() || "-";
 
+    const createdLabel =
+      r.createdAt?.toDate?.() ? r.createdAt.toDate().toLocaleString() : null;
+
     const deliveredLabel =
       r.deliveredAt?.toDate?.() ? r.deliveredAt.toDate().toLocaleString() : null;
 
@@ -117,10 +120,20 @@ export default function RecetasMedico() {
 
             <div className="muted" style={{ marginTop: 6 }}>
               Estado: <b>{estado}</b>
+
+              {createdLabel && (
+                <>
+                  {" "}
+                  · <span className="muted">Solicitada:</span>{" "}
+                  <b>{createdLabel}</b>
+                </>
+              )}
+
               {estado === "entregada" && deliveredLabel ? (
                 <>
                   {" "}
-                  · <span className="muted">Entregada:</span> <b>{deliveredLabel}</b>
+                  · <span className="muted">Entregada:</span>{" "}
+                  <b>{deliveredLabel}</b>
                 </>
               ) : null}
             </div>

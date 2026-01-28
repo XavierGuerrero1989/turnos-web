@@ -1,158 +1,94 @@
-/* Layout general */
-.mtLayout {
-  display: grid;
-  gap: 12px;
-}
+/* src/pages/pacientes/HomePaciente.css */
 
-/* Header: título + filtros */
-.mtHeader {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.mtTitle {
-  margin: 0;
-}
-
-/* Filtros */
-.mtFilters {
-  display: grid;
-  gap: 6px;
-  min-width: 260px;
-}
-
-.mtFiltersLabel {
-  font-weight: 800;
-  color: var(--muted);
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.mtSelect {
-  width: 100%;
-  height: 42px;
-  border-radius: 12px;
+/* ===== Receta activa como card "item" ===== */
+.receta-activa {
   border: 1px solid var(--border);
-  padding: 0 12px;
-  background: #fff;
-  font-weight: 700;
-  outline: none;
-}
-
-.mtSelect:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(179, 37, 235, 0.15);
-}
-
-/* Mobile: filtros full width */
-@media (max-width: 520px) {
-  .mtFilters {
-    min-width: 100%;
-  }
-}
-
-/* Lista */
-.mtList {
+  border-radius: 12px;
+  padding: 12px;
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
-/* Card por turno */
-.mtCard {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
-  align-items: start;
-}
-
-.mtCardTitle {
-  font-weight: 800;
-  margin-bottom: 6px;
+.receta-activa__top {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
 }
 
-.mtBadge {
-  display: inline-block;
-  padding: 2px 10px;
+.receta-activa__badge {
+  font-size: 12px;
+  padding: 4px 10px;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: #fff;
-  font-size: 12px;
-  font-weight: 800;
+  background: rgba(179, 37, 235, 0.08);
+  color: var(--primary);
+  font-weight: 700;
   text-transform: lowercase;
 }
 
-.mtMeta {
-  color: var(--muted);
+.receta-activa__med {
+  font-size: 14px;
 }
 
-.mtProposal {
-  margin-top: 8px;
-}
-
-.mtMuted {
-  color: var(--muted);
-}
-
-/* Acciones propuesta */
-.mtCardActions {
+.receta-activa__meta {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 160px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-/* Responsive card: acciones abajo */
-@media (max-width: 700px) {
-  .mtCard {
-    grid-template-columns: 1fr;
-  }
-
-  .mtCardActions {
-    flex-direction: row;
-    min-width: unset;
-  }
-
-  .mtCardActions .btn {
-    width: 100%;
-  }
+.receta-activa__actions {
+  display: flex;
+  justify-content: flex-start;
 }
 
-/* Mobile: acciones en columna */
-@media (max-width: 520px) {
-  .mtCardActions {
-    flex-direction: column;
-  }
-}
-
-/* ✅ Información importante dentro del turno confirmado */
-.mtImportant {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
+/* ===== Recuadro info RCTA ===== */
+.receta-info {
+  margin-top: 10px;
+  border: 1px solid rgba(255, 193, 7, 0.45);
+  background: rgba(255, 193, 7, 0.12);
+  border-radius: 12px;
+  padding: 12px;
   display: grid;
   gap: 8px;
 }
 
-.mtImportantTitle {
-  font-weight: 900;
-}
-
-.mtLink {
-  color: var(--primary);
-  text-decoration: underline;
+.receta-info__title {
   font-weight: 800;
-  display: inline-block;
-  word-break: break-word;
 }
 
-.mtCodeBtn {
-  width: 100%;
+.receta-info__text {
+  font-size: 13px;
+  opacity: 0.9;
+  line-height: 1.4;
+}
+
+.receta-info__link {
+  font-size: 13px;
+  font-weight: 700;
+  word-break: break-word;
+  text-decoration: underline;
+}
+
+/* ===== Responsivo (home paciente) ===== */
+@media (max-width: 520px) {
+  .home-propuesta-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .home-propuesta-actions {
+    justify-content: stretch;
+  }
+
+  .home-propuesta-actions .btn {
+    width: 100%;
+  }
+
+  .home-bottom-actions {
+    flex-direction: column;
+  }
+
+  .home-bottom-actions .btn {
+    width: 100%;
+  }
 }

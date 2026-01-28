@@ -17,6 +17,7 @@ import {
 import Swal from "sweetalert2";
 import { Navigate, Link, useLocation } from "react-router-dom";
 import TermsModal from "../../shared/TermsModal.jsx";
+import "./HomePaciente.css";
 
 export default function HomePaciente() {
   // ✅ Un solo useAuth: traemos todo junto
@@ -33,6 +34,9 @@ export default function HomePaciente() {
   // ⬇️ Estado para términos (sin versionado)
   const [mustAccept, setMustAccept] = useState(false);
   const [loadingTerms, setLoadingTerms] = useState(true);
+
+  const RCTA_URL =
+    "https://app.rcta.me/patients/5a2aa02e6105ae448d2999b56a0214a5ea19868a";
 
   // ⛔ Mientras carga auth, no mostramos nada (evita parpadeos)
   if (loading) return null;
@@ -166,6 +170,9 @@ export default function HomePaciente() {
     () => recetas.filter((r) => String(r.estado || "").toLowerCase() === "entregada"),
     [recetas]
   );
+
+  // 👇 "Primera vez" según pedido: no hay entregadas aún
+  const esPrimeraVezReceta = useMemo(() => recetasHistoricas.length === 0, [recetasHistoricas]);
 
   const aceptar = async (sol) => {
     setBusyId(sol.id);
@@ -314,7 +321,11 @@ export default function HomePaciente() {
         });
 
         if (obraSocial === "IOMA") {
-          await Swal.fire("Solicitud enviada ✅", "Tu solicitud de receta fue enviada con éxito.", "success");
+          await Swal.fire(
+            "Solicitud enviada ✅",
+            "Tu solicitud de receta fue enviada con éxito.",
+            "success"
+          );
         } else {
           await Swal.fire({
             title: "Información",
@@ -323,8 +334,8 @@ export default function HomePaciente() {
               <div style="text-align:left; line-height:1.6;">
                 <p>Si es su primera solicitud de receta, por favor ingresar al siguiente link y completar sus datos personales a la mayor brevedad posible.</p>
                 <p>
-                  <a href="https://app.rcta.me/patients/5a2aa02e6105ae448d2999b56a0214a5ea19868a" target="_blank" rel="noreferrer">
-                    https://app.rcta.me/patients/5a2aa02e6105ae448d2999b56a0214a5ea19868a
+                  <a href="${RCTA_URL}" target="_blank" rel="noreferrer">
+                    ${RCTA_URL}
                   </a>
                 </p>
               </div>
@@ -401,12 +412,8 @@ export default function HomePaciente() {
         </h3>
         <ul style={{ paddingLeft: "20px", margin: 0 }}>
           <li>Recordá estar lista 5 minutos antes de tu cita.</li>
-          <li>
-            El link de la videollamada lo veras en la sección "Mis Turnos" dentro de tu turno confirmado.
-          </li>
-          <li>
-            Si no enviás el comprobante de pago al mail de la doctora, el turno se considera cancelado.
-          </li>
+          <li>El link de la videollamada lo veras en la sección "Mis Turnos" dentro de tu turno confirmado.</li>
+          <li>Si no enviás el comprobante de pago al mail de la doctora, el turno se considera cancelado.</li>
         </ul>
       </div>
 
@@ -457,24 +464,65 @@ export default function HomePaciente() {
           </>
         ) : (
           <>
-            <div style={{ marginBottom: 8 }}>
-              Tenés una solicitud en curso: <b>{String(recetaActiva.estado || "").toLowerCase()}</b>
+            {/* ✅ NUEVO: receta activa como "card item" */}
+            <div className="item receta-activa">
+              <div className="receta-activa__top">
+                <strong>Solicitud en curso</strong>
+                <span className="receta-activa__badge">
+                  {String(recetaActiva.estado || "").toLowerCase()}
+                </span>
+              </div>
+
+              {recetaActiva.medicacionSolicitada && (
+                <div className="receta-activa__med">
+                  <strong>{recetaActiva.medicacionSolicitada}</strong>
+                </div>
+              )}
+
+              <div className="muted receta-activa__meta">
+                <span>
+                  Obra social: <b>{String(recetaActiva.obraSocial || "").toUpperCase()}</b>
+                </span>
+                {recetaActiva.dni ? (
+                  <span>
+                    DNI: <b>{recetaActiva.dni}</b>
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="muted">
+                Solicitada el <b>{fmtDateTime(recetaActiva.createdAt)}</b>
+              </div>
+
+              <div className="receta-activa__actions">
+                <button
+                  className="btn btn-outline"
+                  onClick={() =>
+                    Swal.fire(
+                      "Solicitud en curso",
+                      "Ya tenés una solicitud de receta en curso. Esperá la respuesta de la doctora.",
+                      "info"
+                    )
+                  }
+                >
+                  Ver estado
+                </button>
+              </div>
             </div>
-            <div className="helper" style={{ marginBottom: 10 }}>
-              Obra social: <b>{recetaActiva.obraSocial}</b>
-            </div>
-            <button
-              className="btn btn-outline"
-              onClick={() =>
-                Swal.fire(
-                  "Solicitud en curso",
-                  "Ya tenés una solicitud de receta en curso. Esperá la respuesta de la doctora.",
-                  "info"
-                )
-              }
-            >
-              Ver estado
-            </button>
+
+            {/* ✅ NUEVO: Recuadro de info SOLO si OTRAS y es primera vez */}
+            {String(recetaActiva.obraSocial || "").toUpperCase() === "OTRAS" && (
+              <div className="receta-info">
+                <div className="receta-info__title">Información importante</div>
+                <div className="receta-info__text">
+                  Si es la primera vez que solicitás una receta por este medio, no olvides ingresar tu
+                  información personal dentro del siguiente link:
+                </div>
+                <a className="receta-info__link" href={RCTA_URL} target="_blank" rel="noreferrer">
+                  {RCTA_URL}
+                </a>
+              </div>
+            )}
           </>
         )}
 
@@ -491,23 +539,27 @@ export default function HomePaciente() {
                 const deliveredLabel = fmtDateTime(r.deliveredAt);
 
                 return (
-                  <li
-                    key={r.id}
-                    className="item"
-                    style={{ display: "grid", gap: 6 }}
-                  >
+                  <li key={r.id} className="item" style={{ display: "grid", gap: 6 }}>
                     <div>
                       <strong>{r.medicacionSolicitada || "—"}</strong>
                     </div>
 
                     <div className="muted" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                      <span>Obra social: <b>{obra || "-"}</b></span>
-                      {isIoma && r.dni ? <span>DNI: <b>{r.dni}</b></span> : null}
+                      <span>
+                        Obra social: <b>{obra || "-"}</b>
+                      </span>
+                      {isIoma && r.dni ? (
+                        <span>
+                          DNI: <b>{r.dni}</b>
+                        </span>
+                      ) : null}
                     </div>
 
                     <div className="muted">
                       {deliveredLabel ? (
-                        <>Entregada el <b>{deliveredLabel}</b></>
+                        <>
+                          Entregada el <b>{deliveredLabel}</b>
+                        </>
                       ) : (
                         <>Entregada</>
                       )}
@@ -536,6 +588,7 @@ export default function HomePaciente() {
                 padding: "8px 0",
                 borderTop: "1px solid var(--border)",
               }}
+              className="home-propuesta-row"
             >
               <div>
                 <div>
@@ -546,7 +599,7 @@ export default function HomePaciente() {
                   Tu solicitud: {sol.diaSolicitado} ({sol.franja === "manana" ? "Mañana" : "Tarde"})
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8 }} className="home-propuesta-actions">
                 <button
                   className="btn btn-primary"
                   disabled={busyId === sol.id}
@@ -584,7 +637,7 @@ export default function HomePaciente() {
             </div>
           ))
         )}
-        <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+        <div style={{ marginTop: 8, display: "flex", gap: 8 }} className="home-bottom-actions">
           <Link className="btn btn-outline" to="/paciente/mis-turnos">
             Ver todas
           </Link>

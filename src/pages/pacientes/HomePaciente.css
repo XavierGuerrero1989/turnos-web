@@ -1,0 +1,73 @@
+.home-paciente {
+  display: grid;
+  gap: 12px;
+}
+
+.receta-card {
+  display: grid;
+  gap: 12px;
+}
+
+.receta-activa {
+  background: #eef4ff;
+  border: 1px solid #c7dbff;
+  border-radius: 8px;
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  width: fit-content;
+}
+
+.badge-info {
+  background: #2563eb;
+  color: #fff;
+}
+
+.receta-warning {
+  background: #fff7e6;
+  border: 1px solid #ffcc80;
+  border-radius: 8px;
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.recetas-historicas {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.propuesta-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.propuesta-item .acciones {
+  display: flex;
+  gap: 8px;
+}
+
+/* 📱 Responsive */
+@media (max-width: 640px) {
+  .propuesta-item {
+    grid-template-columns: 1fr;
+  }
+
+  .propuesta-item .acciones {
+    justify-content: flex-start;
+  }
+}

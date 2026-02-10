@@ -414,6 +414,20 @@ export default function HomePaciente() {
           <li>Recordá estar lista 5 minutos antes de tu cita.</li>
           <li>El link de la videollamada lo veras en la sección "Mis Turnos" dentro de tu turno confirmado.</li>
           <li>Si no enviás el comprobante de pago al mail de la doctora, el turno se considera cancelado.</li>
+          <div>
+                    <p>⚠️ Recordá realizar el pago de tu consulta:</p>
+                    <ul>
+                      <li><b>$30.000</b> — Consulta Ginecológica</li>
+                      <li><b>$40.000</b> — Consulta de Fertilidad</li>
+                    </ul>
+                    <p><b>Alias:</b> DRAYRODRIGUEZ.MP</p>
+                    <p>
+                      📌 <b>Importante:</b><br/>
+                      Enviá el comprobante de pago a la casilla drayaninarodriguez@gmail.com hasta 24 horas antes de tu turno.<br/>
+                      Si no lo recibimos en ese plazo, el turno se considerará <b>cancelado</b>.
+                    </p>
+                  </div>
+
         </ul>
       </div>
 
